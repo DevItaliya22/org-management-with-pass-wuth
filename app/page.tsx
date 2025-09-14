@@ -3,8 +3,26 @@
 import { SignOutButton } from "../components/SignOutButton";
 import { SessionInfo } from "../components/SessionInfo";
 import Link from "next/link";
+import { useMutation } from "convex/react";
+import { api } from "../convex/_generated/api";
+import { useState } from "react";
 
 export default function Home() {
+  const updateUserName = useMutation(api.users.updateUserName);
+  const [newName, setNewName] = useState("");
+
+  const handleNameUpdate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (newName.trim()) {
+      try {
+        await updateUserName({ name: newName.trim() });
+        setNewName("");
+      } catch (error) {
+        console.error("Failed to update name:", error);
+      }
+    }
+  };
+
   return (
     <>
       <header className="sticky top-0 z-10 bg-background p-4 border-b-2 border-slate-200 dark:border-slate-800 flex flex-row justify-between items-center">
@@ -16,6 +34,26 @@ export default function Home() {
           Welcome to Org Management
         </h1>
         <SessionInfo />
+
+        {/* Name Update Form */}
+        <div className="max-w-md mx-auto bg-slate-100 dark:bg-slate-800 p-4 rounded-lg">
+          <h2 className="text-lg font-semibold mb-3">Update Your Name</h2>
+          <form onSubmit={handleNameUpdate} className="flex gap-2">
+            <input
+              type="text"
+              value={newName}
+              onChange={(e) => setNewName(e.target.value)}
+              placeholder="Enter new name"
+              className="flex-1 px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100"
+            />
+            <button
+              type="submit"
+              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+            >
+              Update
+            </button>
+          </form>
+        </div>
         <div className="flex flex-col gap-4 max-w-lg mx-auto">
           <p>
             Edit{" "}
