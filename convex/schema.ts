@@ -10,12 +10,12 @@ export default defineSchema({
   users: defineTable({
     name: v.optional(v.string()),
     image: v.optional(v.string()),
-    email: v.optional(v.string()),
+    email: v.string(),
     emailVerificationTime: v.optional(v.number()),
     role: v.optional(
       v.union(v.literal("owner"), v.literal("reseller"), v.literal("staff")),
     ),
-  }).index("by_email", ["email"]),
+  }).index("email", ["email"]),
 
   // Put reseller table here nd assign role in auth.ts
   teams: defineTable({

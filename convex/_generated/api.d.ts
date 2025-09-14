@@ -16,6 +16,7 @@ import type {
 import type * as auth from "../auth.js";
 import type * as http from "../http.js";
 import type * as lib_teamNames from "../lib/teamNames.js";
+import type * as session from "../session.js";
 import type * as teams from "../teams.js";
 
 /**
@@ -30,6 +31,7 @@ declare const fullApi: ApiFromModules<{
   auth: typeof auth;
   http: typeof http;
   "lib/teamNames": typeof lib_teamNames;
+  session: typeof session;
   teams: typeof teams;
 }>;
 export declare const api: FilterApi<
