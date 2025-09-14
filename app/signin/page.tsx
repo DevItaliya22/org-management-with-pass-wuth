@@ -27,6 +27,14 @@ export default function SignIn() {
             });
         }}
       >
+        <button
+          className="text-foreground underline hover:no-underline cursor-pointer"
+          type="button"
+          onClick={() => signIn("google")}
+        >
+          Sign in with Google
+        </button>
+        <br />
         <input
           className="bg-background text-foreground rounded-md p-2 border-2 border-slate-200 dark:border-slate-800"
           type="email"
