@@ -1,26 +1,249 @@
-@import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
+/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
+All colors MUST be HSL.
+*/
 
-@media (prefers-color-scheme: dark) {
+@layer base {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    /* Light Theme Colors */
+    --background: 0 0% 100%;
+    --foreground: 222 84% 4.9%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 222 84% 4.9%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 84% 4.9%;
+
+    /* Purple-Blue Brand Colors */
+    --primary: 250 84% 60%;
+    --primary-foreground: 210 40% 98%;
+
+    --secondary: 210 40% 96%;
+    --secondary-foreground: 222 84% 4.9%;
+
+    --muted: 210 40% 96%;
+    --muted-foreground: 215 16% 47%;
+
+    --accent: 283 39% 53%;
+    --accent-foreground: 210 40% 98%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 210 40% 98%;
+
+    /* Additional colors for enhanced palette */
+    --success: 142 71% 45%;
+
+    --border: 214 32% 91%;
+    --input: 214 32% 91%;
+    --ring: 250 84% 60%;
+
+    --radius: 1rem;
+
+    /* Cute Services Brand Colors */
+    --brand-gradient: linear-gradient(135deg, hsl(250 84% 60%), hsl(280 84% 60%));
+    --chart-gradient: linear-gradient(135deg, hsl(190 84% 60%), hsl(250 84% 60%));
+    --success-gradient: linear-gradient(135deg, hsl(142 84% 60%), hsl(190 84% 60%));
+    
+    /* Service Category Colors */
+    --chipotle: 14 100% 60%;
+    --movies: 250 84% 60%;
+    --flights: 190 84% 60%;
+    --others: 280 84% 60%;
+
+    /* Sidebar Colors */
+    --sidebar-background: 0 0% 98%;
+    --sidebar-foreground: 222 84% 4.9%;
+    --sidebar-primary: 250 84% 60%;
+    --sidebar-primary-foreground: 210 40% 98%;
+    --sidebar-accent: 210 40% 96%;
+    --sidebar-accent-foreground: 222 84% 4.9%;
+    --sidebar-border: 214 32% 91%;
+    --sidebar-ring: 250 84% 60%;
+  }
+
+  /* Force dark mode */
+  .dark {
+    --background: 222 84% 2.5%;
+    --foreground: 210 40% 98%;
+    --card: 228 71% 7%;
+    --card-foreground: 210 40% 98%;
+    --popover: 228 71% 7%;
+    --popover-foreground: 210 40% 98%;
+    --primary: 250 84% 60%;
+    --primary-foreground: 210 40% 98%;
+    --secondary: 222 84% 4.5%;
+    --secondary-foreground: 210 40% 98%;
+    --muted: 222 84% 4%;
+    --muted-foreground: 215 16% 65%;
+    --accent: 250 84% 60%;
+    --accent-foreground: 210 40% 98%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 228 71% 15%;
+    --input: 228 71% 12%;
+    --ring: 250 84% 60%;
+    --sidebar-background: 222 84% 2.5%;
+    --sidebar-foreground: 210 40% 98%;
+    --sidebar-primary: 250 84% 60%;
+    --sidebar-primary-foreground: 210 40% 98%;
+    --sidebar-accent: 228 71% 10%;
+    --sidebar-accent-foreground: 210 40% 98%;
+    --sidebar-border: 228 71% 15%;
+    --sidebar-ring: 250 84% 60%;
   }
 }
 
-body {
-  color: var(--foreground);
-  background: var(--background);
-  font-family: Arial, Helvetica, sans-serif;
+@layer base {
+  * {
+    border-color: hsl(var(--border));
+  }
+
+  body {
+    background-color: hsl(var(--background));
+    color: hsl(var(--foreground));
+  }
+
+  /* Custom gradient backgrounds */
+  .gradient-brand {
+    background: var(--brand-gradient);
+  }
+
+  .gradient-chart {
+    background: var(--chart-gradient);
+  }
+
+  .gradient-success {
+    background: var(--success-gradient);
+  }
+
+  /* Service category styles */
+  .service-chipotle {
+    background: hsl(var(--chipotle));
+  }
+
+  .service-movies {
+    background: hsl(var(--movies));
+  }
+
+  .service-flights {
+    background: hsl(var(--flights));
+  }
+
+  .service-others {
+    background: hsl(var(--others));
+  }
+
+  /* Custom soft gradients for service cards */
+  .service-gradient {
+    background: linear-gradient(135deg, 
+      oklch(0.5 0.03 180) 0%, 
+      oklch(0.45 0.04 200) 25%, 
+      oklch(0.4 0.035 270) 50%, 
+      oklch(0.45 0.045 320) 100%);
+    filter: brightness(0.8);
+    opacity: 0.7;
+  }
+
+  .action-gradient {
+    background: linear-gradient(
+      135deg,
+      oklch(0.55 0.025 180 / 0.35) 0%,
+      oklch(0.50 0.030 200 / 0.35) 25%,
+      oklch(0.45 0.025 270 / 0.35) 50%,
+      oklch(0.50 0.035 320 / 0.35) 100%
+    );
+  }
+
+  /* Light mode specific gradients */
+  .light .service-gradient {
+    background: linear-gradient(135deg, 
+      oklch(0.95 0.02 180) 0%, 
+      oklch(0.93 0.03 200) 25%, 
+      oklch(0.92 0.025 270) 50%, 
+      oklch(0.94 0.03 320) 100%);
+    filter: brightness(1.1);
+    opacity: 0.8;
+  }
+
+  .light .action-gradient {
+    background: linear-gradient(
+      135deg,
+      oklch(0.96 0.015 180 / 0.4) 0%,
+      oklch(0.94 0.02 200 / 0.4) 25%,
+      oklch(0.93 0.015 270 / 0.4) 50%,
+      oklch(0.95 0.02 320 / 0.4) 100%
+    );
+  }
+
+  /* Chart animations */
+  @keyframes fadeInUp {
+    from {
+      opacity: 0;
+      transform: translateY(20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .animate-fade-in-up {
+    animation: fadeInUp 0.6s ease-out;
+  }
+
+  /* Smooth transitions */
+  .transition-smooth {
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  /* Additional styles from React app.css */
+  #root {
+    max-width: 1280px;
+    margin: 0 auto;
+    padding: 2rem;
+    text-align: center;
+  }
+
+  .logo {
+    height: 6em;
+    padding: 1.5em;
+    will-change: filter;
+    transition: filter 300ms;
+  }
+  
+  .logo:hover {
+    filter: drop-shadow(0 0 2em #646cffaa);
+  }
+  
+  .logo.react:hover {
+    filter: drop-shadow(0 0 2em #61dafbaa);
+  }
+
+  @keyframes logo-spin {
+    from {
+      transform: rotate(0deg);
+    }
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    a:nth-of-type(2) .logo {
+      animation: logo-spin infinite 20s linear;
+    }
+  }
+
+  .card {
+    padding: 2em;
+  }
+
+  .read-the-docs {
+    color: #888;
+  }
 }
