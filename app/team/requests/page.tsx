@@ -12,12 +12,13 @@ import { Button } from "@/components/ui/button";
 
 export default function TeamRequestsPage() {
   const role = useRole();
-  
-  if (!role.isResellerDefaultMember && !role.isResellerMember) return notFound();
+  const canView = role.isResellerDefaultMember || role.isResellerMember;
 
   const invites = useQuery(api.teams.listMyInvitations, {});
   const accept = useMutation(api.teams.acceptInvitation);
   const reject = useMutation(api.teams.rejectInvitation);
+
+  if (!canView) return notFound();
 
   return (
     <DashboardLayout>

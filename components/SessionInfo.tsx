@@ -2,6 +2,7 @@
 
 import { useQuery } from "convex/react";
 import { api } from "../convex/_generated/api";
+import Image from "next/image";
 
 export function SessionInfo() {
   const sessionData = useQuery(api.session.getCurrentUserSession);
@@ -58,10 +59,12 @@ export function SessionInfo() {
         </div>
         {user.image && (
           <div className="mt-3">
-            <img
+            <Image
               src={user.image}
               alt="Profile"
-              className="w-16 h-16 rounded-full"
+              width={64}
+              height={64}
+              className="rounded-full"
             />
           </div>
         )}

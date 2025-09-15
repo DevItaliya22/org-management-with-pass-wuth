@@ -211,7 +211,7 @@ export default function SignIn() {
                 <div className="text-center text-sm text-muted-foreground">
                   {step === "signIn" ? (
                     <>
-                      Don't have an account?{" "}
+                      Don&#39;t have an account?{" "}
                       <button
                         type="button"
                         className="text-foreground underline hover:no-underline"

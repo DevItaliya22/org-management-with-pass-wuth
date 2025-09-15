@@ -13,11 +13,13 @@ import GradientButton from "@/components/ui/gradient-button";
 
 export default function PromotionPage() {
   const role = useRole();
-  if (!role.isResellerDefaultMember) return notFound();
+  const canView = !!role.isResellerDefaultMember;
 
   const teamId = role.session?.team?._id;
   const myRequests = useQuery(api.teams.listMyPromotionRequests, {});
   const requestPromotion = useMutation(api.teams.requestPromotion);
+
+  if (!canView) return notFound();
 
   const sendRequest = async () => {
     if (!teamId) return;

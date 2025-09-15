@@ -16,12 +16,14 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 
 export default function StaffCreationPage() {
   const role = useRole();
-  if (!role.isOwner) return notFound();
+  const canView = !!role.isOwner;
 
   const createStaff = useAction(api.staff.createStaffWithPassword);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [status, setStatus] = useState<string | null>(null);
+
+  if (!canView) return notFound();
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

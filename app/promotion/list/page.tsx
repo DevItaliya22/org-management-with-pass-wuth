@@ -12,12 +12,14 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 
 export default function PromotionRequestsPage() {
   const role = useRole();
-  if (!role.isOwner) return notFound();
+  const canView = !!role.isOwner;
 
   const requests = useQuery(api.teams.listPromotionRequests, {} as any);
   const review = useMutation(api.teams.reviewPromotionRequest);
   const pending = (requests ?? []).filter((r) => r.status === "pending");
   const history = (requests ?? []).filter((r) => r.status !== "pending");
+
+  if (!canView) return notFound();
 
   return (
     <DashboardLayout>

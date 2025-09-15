@@ -15,7 +15,6 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 export default function TeamEditPage() {
   const role = useRole();
   const isAdmin = role?.isResellerAdmin;
-  if (!isAdmin) return notFound();
 
   const team = role?.session?.team;
   const [name, setName] = useState(team?.name ?? "");
@@ -33,6 +32,8 @@ export default function TeamEditPage() {
       setMsg(err?.message ?? "Failed");
     }
   };
+
+  if (!isAdmin) return notFound();
 
   return (
     <DashboardLayout>

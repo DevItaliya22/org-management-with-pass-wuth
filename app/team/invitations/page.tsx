@@ -17,9 +17,8 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 export default function TeamInvitationsPage() {
   const role = useRole();
   const isAdmin = role?.isResellerAdmin;
-  if (!isAdmin) return notFound();
-
   const teamId = role?.session?.team?._id;
+
   const [email, setEmail] = useState("");
   const invite = useMutation(api.teams.inviteToTeam);
   const invitations = useQuery(
@@ -36,6 +35,8 @@ export default function TeamInvitationsPage() {
   };
 
   const [inviteOpen, setInviteOpen] = useState(false);
+
+  if (!isAdmin) return notFound();
 
   return (
     <DashboardLayout>
