@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { LucideIcon } from "lucide-react";
 import { useTheme } from "@/contexts/ThemeContext";
+import GradientButton from "@/components/ui/gradient-button";
 
 interface ServiceCardProps {
   name: string;
@@ -70,18 +71,9 @@ export function ServiceCard({
         </div>
         
          {/* Bottom Action Button */}
-         <button 
-           className="flex items-center justify-between px-4 py-3 rounded-lg w-full text-left border-0 outline-none"
-           style={{
-             background: buttonGradient,
-             color: buttonTextColor
-           }}
-         >
-           {time && (
-             <span className="text-sm font-bold" style={{color: buttonTextColor}}>{time}</span>
-           )}
-           <span className="text-sm font-bold" style={{color: buttonTextColor}}>{action}</span>
-         </button>
+         <GradientButton leftLabel={time}>
+           {action}
+         </GradientButton>
       </CardContent>
     </Card>
   );

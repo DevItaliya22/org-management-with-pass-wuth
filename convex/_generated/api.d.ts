@@ -17,6 +17,7 @@ import type * as auth from "../auth.js";
 import type * as http from "../http.js";
 import type * as lib_teamNames from "../lib/teamNames.js";
 import type * as session from "../session.js";
+import type * as staff from "../staff.js";
 import type * as teams from "../teams.js";
 import type * as users from "../users.js";
 
@@ -33,6 +34,7 @@ declare const fullApi: ApiFromModules<{
   http: typeof http;
   "lib/teamNames": typeof lib_teamNames;
   session: typeof session;
+  staff: typeof staff;
   teams: typeof teams;
   users: typeof users;
 }>;

@@ -9,17 +9,19 @@ export const { auth, signIn, signOut, store, isAuthenticated } = convexAuth({
     async afterUserCreatedOrUpdated(ctx, args) {
       if (args.existingUserId) return; // this will work when user is doing sign-in
 
-      // First Time user creation ( role assignment )
-      await ctx.db.patch(args.userId, {
-        role: "reseller",
-      });
+      // If creation flow marks this user as staff, skip reseller bootstrap
+      // We rely on role passed in profile during account creation
+      const isStaff = (args as any)?.profile?.role === "staff";
+      if (isStaff) {
+        await ctx.db.patch(args.userId, { role: "staff" });
+        return;
+      }
 
-      // Create a team for the new reseller
-      const teamId = await ctx.runMutation(internal.teams.createTeam, {
-        userId: args.userId,
-      });
+      // Default: bootstrap reseller account with team & membership
+      await ctx.db.patch(args.userId, { role: "reseller" });
 
-      // Create reseller member record
+      const teamId = await ctx.runMutation(internal.teams.createTeam, { userId: args.userId });
+
       await ctx.runMutation(internal.teams.createResellerMember, {
         teamId,
         userId: args.userId,
