@@ -16,8 +16,11 @@ import type {
 import type * as auth from "../auth.js";
 import type * as http from "../http.js";
 import type * as lib_teamNames from "../lib/teamNames.js";
+import type * as otp_NodemailerOTP from "../otp/NodemailerOTP.js";
+import type * as otp_sendEmailAction from "../otp/sendEmailAction.js";
 import type * as session from "../session.js";
 import type * as teams from "../teams.js";
+import type * as templates_VerificationCodeEmail from "../templates/VerificationCodeEmail.js";
 import type * as users from "../users.js";
 
 /**
@@ -32,8 +35,11 @@ declare const fullApi: ApiFromModules<{
   auth: typeof auth;
   http: typeof http;
   "lib/teamNames": typeof lib_teamNames;
+  "otp/NodemailerOTP": typeof otp_NodemailerOTP;
+  "otp/sendEmailAction": typeof otp_sendEmailAction;
   session: typeof session;
   teams: typeof teams;
+  "templates/VerificationCodeEmail": typeof templates_VerificationCodeEmail;
   users: typeof users;
 }>;
 export declare const api: FilterApi<
