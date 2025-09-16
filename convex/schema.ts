@@ -135,8 +135,10 @@ export default defineSchema({
       timeWindow: v.optional(v.string()),
       itemsSummary: v.optional(v.string()),
       currencyOverride: v.optional(v.string()),
+
+      // Here order status works like this , when reseller side they submit the form , then the order is in queue , then staff member will either pick or pass , now if picks then no one else can pick this order , and the status of order will be picked for all the person means himself , all other staff and resellers too , now he can update the status of order to in_progress or on_hold and that will be the same as above only , now if he pass then the order status will be pass only for himself , all the other staff member can still see the order as submitted / inqueue accorsing to the side , and let sayif all the staff members has passed the order then the order will be gone to cancelled status rather than passed status , so now all will see cancelled on all the sides means reseller and all staff . Other status like  completed and fullfill_submitted can only be done by the staff member who has picked the order , disputed can be done only by reseller (memebrr or admin any who madr this order ) but only once the order is compeletd .
       status: v.union(
-        v.literal("submitted"), // when reseller submits the order
+        v.literal("submitted"), // /in_queue // when reseller submits the order in reseller side it will be submitted and in staff side it will be in queue
         v.literal("picked"), // when staff picks the order
         v.union(v.literal("in_progress"), v.literal("on_hold")), // when staff is on hold or in progress
         v.literal("fulfil_submitted"), // comes after on hold or in progress
@@ -144,6 +146,9 @@ export default defineSchema({
         v.literal("disputed"), // when order is completed and theres a dispute
         v.literal("cancelled") // when reseller cancels the order
       ),
+      orderPassedByUserId: v.array(v.object({userId: v.id("users"), passedAt: v.number(), reason: v.string()})), // Who passed the order ( always will be staff only still we will use user_id not staff_id)
+      // Here if we ever make a function for checking order by passed user , then there should be check that if all the staff members has passed the order then the order will be gone to cancelled status rather than passed status
+      
       holdReason: v.optional(v.string()),
       autoCancelAt: v.optional(v.number()),
       fulfilment: v.optional(
@@ -172,18 +177,8 @@ export default defineSchema({
       .index("by_created_by", ["createdByUserId"])
       .index("by_picked_by", ["pickedByStaffUserId"])
       .index("by_createdAt", ["createdAt"])
-      .index("by_acceptedAt", ["acceptedAt"]),
-  
-    orderPasses: defineTable({
-      orderId: v.id("orders"),
-      fromStaffUserId: v.id("users"), // who passed the order
-      toStaffUserId: v.optional(v.id("users")), // who it was passed to (if directly reassigned)
-      reason: v.string(),
-      createdAt: v.number(),
-    })
-      .index("by_order", ["orderId"])
-      .index("by_from_staff", ["fromStaffUserId"])
-      .index("by_to_staff", ["toStaffUserId"]),
+      .index("by_acceptedAt", ["acceptedAt"])
+      .index("by_passed_by", ["orderPassedByUserId"]),
   
     chats: defineTable({
       orderId: v.id("orders"),
@@ -204,6 +199,7 @@ export default defineSchema({
       content: v.optional(v.string()),
       attachmentFileIds: v.optional(v.array(v.id("files"))),
       createdAt: v.number(),
+      viewedByUserIds: v.array(v.id("users")), // Users who have viewed this message
     })
       .index("by_chat", ["chatId"])
       .index("by_sender", ["senderUserId"])
