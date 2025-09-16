@@ -170,6 +170,8 @@ export default defineSchema({
       acceptedAt: v.optional(v.number()), // When order was accepted (moved to picked/in_progress)
       createdAt: v.number(),
       updatedAt: v.number(),
+      readAccessUserIds: v.array(v.id("users")), // Users who have read access to this chat , all user id will come staff , reseller , owner , members
+      writeAccessUserIds: v.array(v.id("users")), // Users who have write access to this chat , all user id will come staff , reseller , owner , members
     })
       .index("by_team", ["teamId"])
       .index("by_category", ["categoryId"])
@@ -178,20 +180,18 @@ export default defineSchema({
       .index("by_picked_by", ["pickedByStaffUserId"])
       .index("by_createdAt", ["createdAt"])
       .index("by_acceptedAt", ["acceptedAt"])
-      .index("by_passed_by", ["orderPassedByUserId"]),
+      .index("by_passed_by", ["orderPassedByUserId"])
+      .index("by_read_access", ["readAccessUserIds"])
+      .index("by_write_access", ["writeAccessUserIds"]),
   
     chats: defineTable({
       orderId: v.id("orders"),
       isOpen: v.boolean(),
       openedAt: v.number(),
       closedAt: v.optional(v.number()),
-      readAccessUserIds: v.array(v.id("users")), // Users who have read access to this chat , all user id will come staff , reseller , owner , members
-      writeAccessUserIds: v.array(v.id("users")), // Users who have write access to this chat , all user id will come staff , reseller , owner , members
     })
       .index("by_order", ["orderId"])
-      .index("by_open", ["isOpen"])
-      .index("by_read_access", ["readAccessUserIds"])
-      .index("by_write_access", ["writeAccessUserIds"]),
+      .index("by_open", ["isOpen"]),
   
     messages: defineTable({
       chatId: v.id("chats"),
