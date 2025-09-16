@@ -8,12 +8,17 @@ export function useRole() {
   const isLoading = session === undefined;
 
   const role = session?.user?.role || "reseller";
+  const memberStatus = session?.resellerMember?.status;
+  const memberRole = session?.resellerMember?.role;
+
   const isOwner = role === "owner";
   const isStaff = role === "staff";
-  const isReseller = role === "reseller";
-  const isResellerAdmin = session?.resellerMember?.role === "admin";
-  const isResellerMember = session?.resellerMember?.role === "member";
-  const isResellerDefaultMember = session?.resellerMember?.status === "default_member";
+  const isResellerDefaultMember = memberStatus === "default_member";
+
+  // Only one of these should be true for reseller-side:
+  const isResellerAdmin = !isResellerDefaultMember && memberRole === "admin";
+  const isResellerMember = !isResellerDefaultMember && memberRole === "member";
+  const isReseller = !isResellerDefaultMember && role === "reseller" && (isResellerAdmin || isResellerMember);
 
   return {
     session,

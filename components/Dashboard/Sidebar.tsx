@@ -15,6 +15,7 @@ interface SidebarProps {
 export function Sidebar({ className }: SidebarProps) {
   const pathname = usePathname();
   const role = useRole();
+  console.log(role)
 
   const items: Array<{ name: string; href: string; icon: any }> = [
     {
@@ -33,7 +34,7 @@ export function Sidebar({ className }: SidebarProps) {
     items.push({
       name: "Staff Management",
       href: "/staff/management",
-      icon: UserPlus2,
+      icon: UserPlus2,  
     });
     items.push({
       name: "Categories",
@@ -42,13 +43,22 @@ export function Sidebar({ className }: SidebarProps) {
     });
   } else if (role.isStaff) {
     // Dashboard only
-
+     items.push({
+      name: "Queue",
+      href: "/staff/queue",
+      icon: Users,
+     })
   } else {
     if (role.isResellerAdmin) {
       items.push({ name: "Edit Team Name", href: "/team/edit", icon: Users });
       items.push({
         name: "Team Invitations",
         href: "/team/invitations",
+        icon: Users,
+      });
+      items.push({
+        name: "Orders",
+        href: "/orders",
         icon: Users,
       });
       items.push({
@@ -61,6 +71,11 @@ export function Sidebar({ className }: SidebarProps) {
       items.push({
         name: "Team Requests",
         href: "/team/requests",
+        icon: Users,
+      });
+      items.push({
+        name: "Orders",
+        href: "/orders",
         icon: Users,
       });
       items.push({

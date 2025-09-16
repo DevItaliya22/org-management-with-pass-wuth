@@ -291,6 +291,24 @@ export const listAllCategories = query({
   },
 });
 
+export const getUserLabels = query({
+  args: { userIds: v.array(v.id("users")) },
+  returns: v.record(
+    v.id("users"),
+    v.object({ name: v.optional(v.string()), email: v.string() })
+  ),
+  handler: async (ctx, args) => {
+    const result: Record<string, { name?: string; email: string }> = {};
+    for (const uid of args.userIds) {
+      const u = await ctx.db.get(uid);
+      if (u) {
+        result[uid] = { name: u.name, email: u.email } as any;
+      }
+    }
+    return result as any;
+  },
+});
+
 export const createCategory = mutation({
   args: { name: v.string(), slug: v.string() },
   returns: v.null(),
@@ -592,6 +610,40 @@ export const raiseDispute = mutation({
       createdAt: now,
     });
     return null;
+  },
+});
+
+export const getDisputesByOrder = query({
+  args: { orderId: v.id("orders") },
+  returns: v.array(
+    v.object({
+      _id: v.id("disputes"),
+      orderId: v.id("orders"),
+      teamId: v.id("teams"),
+      raisedByUserId: v.id("users"),
+      reason: v.string(),
+      attachmentFileIds: v.optional(v.array(v.id("files"))),
+      status: v.union(
+        v.literal("open"),
+        v.literal("approved"),
+        v.literal("declined"),
+        v.literal("partial_refund"),
+        v.literal("resolved"),
+      ),
+      createdAt: v.number(),
+      resolvedByUserId: v.optional(v.id("users")),
+      resolvedAt: v.optional(v.number()),
+      resolutionNotes: v.optional(v.string()),
+      adjustmentAmountUsd: v.optional(v.number()),
+    })
+  ),
+  handler: async (ctx, args) => {
+    const disputes = await ctx.db
+      .query("disputes")
+      .withIndex("by_order", (q) => q.eq("orderId", args.orderId))
+      .order("desc")
+      .collect();
+    return disputes;
   },
 });
 
