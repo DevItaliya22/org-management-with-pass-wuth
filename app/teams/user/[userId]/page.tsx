@@ -3,7 +3,7 @@
 import DashboardLayout from "@/components/Dashboard/DashboardLayout";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import { notFound } from "next/navigation";
+import { notFound, useRouter } from "next/navigation";
 import React, { useState } from "react";
 import { useRole } from "@/hooks/use-role";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -24,8 +24,8 @@ interface UserDetailPageProps {
 }
 
 export default function UserDetailPage({ params }: UserDetailPageProps) {
-  const role = useRole();
-  const isAdmin = role?.isResellerAdmin;
+  const { isLoading, isResellerAdmin, isOwner, session } = useRole();
+  const router = useRouter();
 
   const [isUpdating, setIsUpdating] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
@@ -64,7 +64,7 @@ export default function UserDetailPage({ params }: UserDetailPageProps) {
     }
   };
 
-  if (!isAdmin) return notFound();
+  if (isLoading) return null;
 
   if (!resolvedParams) {
     return (
@@ -88,6 +88,24 @@ export default function UserDetailPage({ params }: UserDetailPageProps) {
     );
   }
 
+  // Access control: self-view allowed; owner can view anyone; reseller admin can view users in their own team
+  const isSelf =
+    resolvedParams?.userId && session?.user?._id === resolvedParams.userId;
+  let allowed = false;
+  if (isOwner) {
+    allowed = true;
+  } else if (isSelf) {
+    allowed = true;
+  } else if (isResellerAdmin) {
+    const viewerTeamId = session?.resellerMember?.teamId;
+    const targetTeamId = userDetails?.resellerMember?.teamId;
+    if (viewerTeamId && targetTeamId && viewerTeamId === targetTeamId) {
+      allowed = true;
+    }
+  }
+
+  if (!allowed) return notFound();
+
   if (userDetails === null) {
     return (
       <DashboardLayout>
@@ -96,12 +114,10 @@ export default function UserDetailPage({ params }: UserDetailPageProps) {
           <p className="text-muted-foreground">
             The requested user could not be found.
           </p>
-          <Link href="/team/edit">
-            <Button className="mt-4">
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Back to Team Management
-            </Button>
-          </Link>
+          <Button className="mt-4" onClick={() => router.back()}>
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back
+          </Button>
         </div>
       </DashboardLayout>
     );
@@ -113,12 +129,10 @@ export default function UserDetailPage({ params }: UserDetailPageProps) {
         {/* Header */}
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-4">
-            <Link href="/team/edit">
-              <Button variant="outline" size="sm">
-                <ArrowLeft className="h-4 w-4 mr-2" />
-                Back
-              </Button>
-            </Link>
+            <Button variant="outline" size="sm" onClick={() => router.back()}>
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Back
+            </Button>
             <div>
               <h2 className="text-2xl font-semibold tracking-tight">
                 {userDetails.name || "User Details"}

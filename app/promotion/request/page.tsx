@@ -5,20 +5,42 @@ import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { notFound } from "next/navigation";
 import { useRole } from "@/hooks/use-role";
+import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import GradientButton from "@/components/ui/gradient-button";
 
 export default function PromotionPage() {
-  const role = useRole();
-  const canView = !!role.isResellerDefaultMember;
+  const { isLoading, isResellerDefaultMember, session } = useRole();
 
-  const teamId = role.session?.team?._id;
-  const myRequests = useQuery(api.teams.listMyPromotionRequests, {});
+  const [ready, setReady] = useState(false);
+  const [canView, setCanView] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    if (!isLoading) {
+      setReady(true);
+      setCanView(!!isResellerDefaultMember);
+    }
+  }, [isLoading, isResellerDefaultMember]);
+
+  const teamId = session?.team?._id;
+  
+  const myRequests = useQuery(
+    api.teams.listMyPromotionRequests,
+    ready ? {} : undefined,
+  );
   const requestPromotion = useMutation(api.teams.requestPromotion);
 
+  if (!ready) return null;
   if (!canView) return notFound();
 
   const sendRequest = async () => {
@@ -31,7 +53,9 @@ export default function PromotionPage() {
       <div className="space-y-4">
         <div>
           <h2 className="text-xl font-semibold tracking-tight">Promotion</h2>
-          <p className="text-sm text-muted-foreground">Request admin rights for your current team.</p>
+          <p className="text-sm text-muted-foreground">
+            Request admin rights for your current team.
+          </p>
         </div>
 
         <div className="flex items-center gap-2">
@@ -41,7 +65,9 @@ export default function PromotionPage() {
             </GradientButton>
           </div>
           {!teamId && (
-            <span className="text-xs text-muted-foreground">Join or select a team to request promotion.</span>
+            <span className="text-xs text-muted-foreground">
+              Join or select a team to request promotion.
+            </span>
           )}
         </div>
 
@@ -62,10 +88,15 @@ export default function PromotionPage() {
                 <TableBody>
                   {myRequests.map((r) => (
                     <TableRow key={r._id}>
-                      <TableCell className="font-medium">{r.teamName}</TableCell>
+                      <TableCell className="font-medium">
+                        {r.teamName}
+                      </TableCell>
                       <TableCell>
                         {r.status === "approved" ? (
-                          <Badge variant="outline" className="bg-green-600 text-white hover:bg-green-600">
+                          <Badge
+                            variant="outline"
+                            className="bg-green-600 text-white hover:bg-green-600"
+                          >
                             {r.status}
                           </Badge>
                         ) : r.status === "rejected" ? (
@@ -74,13 +105,17 @@ export default function PromotionPage() {
                           <Badge variant="outline">{r.status}</Badge>
                         )}
                       </TableCell>
-                      <TableCell className="text-right">{new Date(r.requestedAt).toLocaleString()}</TableCell>
+                      <TableCell className="text-right">
+                        {new Date(r.requestedAt).toLocaleString()}
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
               </Table>
             ) : (
-              <div className="text-sm text-muted-foreground">No requests yet.</div>
+              <div className="text-sm text-muted-foreground">
+                No requests yet.
+              </div>
             )}
           </CardContent>
         </Card>
@@ -88,5 +123,3 @@ export default function PromotionPage() {
     </DashboardLayout>
   );
 }
-
-

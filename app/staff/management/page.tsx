@@ -32,11 +32,13 @@ import { Edit, Plus, Loader2 } from "lucide-react";
 import { Id } from "@/convex/_generated/dataModel";
 
 export default function StaffManagementPage() {
-  const role = useRole();
-  const canView = !!role.isOwner;
+  const { isLoading, isOwner } = useRole();
 
   // Queries and mutations
-  const staffMembers = useQuery(api.staff.getAllStaff);
+  const staffMembers = useQuery(
+    api.staff.getAllStaff,
+    isLoading ? (undefined as any) : ({} as any),
+  );
   const createStaff = useAction(api.staff.createStaffWithPassword);
   const updateStaffName = useMutation(
     api.staff.updateStaffName,
@@ -52,8 +54,6 @@ export default function StaffManagementPage() {
     }
   });
 
-
-  
   // Create staff modal state
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [email, setEmail] = useState("");
@@ -119,15 +119,16 @@ export default function StaffManagementPage() {
     setIsEditModalOpen(true);
   };
 
-  if (!canView) return notFound();
-  
+  if (isLoading) return null;
+  if (!isOwner) return notFound();
+
   return (
     <DashboardLayout>
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <div>
             <h2 className="text-2xl font-semibold tracking-tight">
-              Staff Management 
+              Staff Management
             </h2>
             <p className="text-sm text-muted-foreground">
               Manage your staff members and their accounts.
