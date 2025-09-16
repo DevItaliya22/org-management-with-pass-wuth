@@ -11,19 +11,37 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 export default function TeamInvitationsPage() {
-  const role = useRole();
-  const isAdmin = role?.isResellerAdmin;
-  const teamId = role?.session?.team?._id;
+  const { isLoading, isResellerAdmin, session } = useRole();
+  const isAdmin = isResellerAdmin;
+  const teamId = session?.team?._id;
 
   const [email, setEmail] = useState("");
   const invite = useMutation(api.teams.inviteToTeam);
   const invitations = useQuery(
     api.teams.listTeamInvitations,
-    teamId ? { teamId, status: undefined } : ("skip" as any)
+    isLoading
+      ? (undefined as any)
+      : teamId
+        ? { teamId, status: undefined }
+        : ("skip" as any),
   );
 
   const onInvite = async (e: React.FormEvent) => {
@@ -36,6 +54,7 @@ export default function TeamInvitationsPage() {
 
   const [inviteOpen, setInviteOpen] = useState(false);
 
+  if (isLoading) return null;
   if (!isAdmin) return notFound();
 
   return (
@@ -43,25 +62,42 @@ export default function TeamInvitationsPage() {
       <div className="space-y-4">
         <div className="flex items-start justify-between gap-2">
           <div>
-            <h2 className="text-xl font-semibold tracking-tight">Team Invitations</h2>
-            <p className="text-sm text-muted-foreground">Invite members to your team and track invitation status.</p>
+            <h2 className="text-xl font-semibold tracking-tight">
+              Team Invitations
+            </h2>
+            <p className="text-sm text-muted-foreground">
+              Invite members to your team and track invitation status.
+            </p>
           </div>
-          <Button onClick={() => setInviteOpen(true)} disabled={!teamId}>Invite</Button>
+          <Button onClick={() => setInviteOpen(true)} disabled={!teamId}>
+            Invite
+          </Button>
         </div>
 
         <Dialog open={inviteOpen} onOpenChange={setInviteOpen}>
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Invite a Member</DialogTitle>
-              <DialogDescription>Send an invitation to join your team.</DialogDescription>
+              <DialogDescription>
+                Send an invitation to join your team.
+              </DialogDescription>
             </DialogHeader>
             <form className="space-y-3" onSubmit={onInvite}>
               <div className="space-y-2">
                 <Label htmlFor="invite-email">Email</Label>
-                <Input id="invite-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="user@example.com" required />
+                <Input
+                  id="invite-email"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="user@example.com"
+                  required
+                />
               </div>
               <DialogFooter>
-                <Button type="submit" disabled={!teamId || !email}>Send Invite</Button>
+                <Button type="submit" disabled={!teamId || !email}>
+                  Send Invite
+                </Button>
               </DialogFooter>
             </form>
           </DialogContent>
@@ -84,25 +120,36 @@ export default function TeamInvitationsPage() {
                 <TableBody>
                   {invitations.map((i) => (
                     <TableRow key={i._id}>
-                      <TableCell className="font-medium break-all">{i.invitedEmail}</TableCell>
+                      <TableCell className="font-medium break-all">
+                        {i.invitedEmail}
+                      </TableCell>
                       <TableCell>
                         {i.status === "rejected" ? (
                           <Badge variant="destructive">{i.status}</Badge>
                         ) : i.status === "expired" ? (
                           <Badge variant="outline">{i.status}</Badge>
                         ) : i.status !== "pending" ? (
-                          <Badge variant="outline" className="bg-green-600 text-white hover:bg-green-600">{i.status}</Badge>
+                          <Badge
+                            variant="outline"
+                            className="bg-green-600 text-white hover:bg-green-600"
+                          >
+                            {i.status}
+                          </Badge>
                         ) : (
                           <Badge variant="outline">{i.status}</Badge>
                         )}
                       </TableCell>
-                      <TableCell className="text-right">{new Date(i.invitedAt).toLocaleString()}</TableCell>
+                      <TableCell className="text-right">
+                        {new Date(i.invitedAt).toLocaleString()}
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
               </Table>
             ) : (
-              <div className="text-sm text-muted-foreground">No invitations yet.</div>
+              <div className="text-sm text-muted-foreground">
+                No invitations yet.
+              </div>
             )}
           </CardContent>
         </Card>
@@ -110,5 +157,3 @@ export default function TeamInvitationsPage() {
     </DashboardLayout>
   );
 }
-
-

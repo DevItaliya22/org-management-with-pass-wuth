@@ -7,7 +7,8 @@ export function useRole() {
   const session = useQuery(api.session.getCurrentUserSession, {});
   const isLoading = session === undefined;
 
-  const role = session?.user?.role || "reseller";
+  // Avoid defaulting while loading to prevent incorrect redirects/404s on hard reload
+  const role = isLoading ? undefined : session?.user?.role;
   const memberStatus = session?.resellerMember?.status;
   const memberRole = session?.resellerMember?.role;
 
@@ -18,7 +19,10 @@ export function useRole() {
   // Only one of these should be true for reseller-side:
   const isResellerAdmin = !isResellerDefaultMember && memberRole === "admin";
   const isResellerMember = !isResellerDefaultMember && memberRole === "member";
-  const isReseller = !isResellerDefaultMember && role === "reseller" && (isResellerAdmin || isResellerMember);
+  const isReseller =
+    !isResellerDefaultMember &&
+    role === "reseller" &&
+    (isResellerAdmin || isResellerMember);
 
   return {
     session,
@@ -32,5 +36,3 @@ export function useRole() {
     isResellerDefaultMember,
   } as const;
 }
-
-

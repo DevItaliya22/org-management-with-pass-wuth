@@ -10,16 +10,34 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useState } from "react";
-import { Dialog, DialogContent, DialogHeader as DHeader, DialogTitle as DTitle, DialogTrigger } from "@/components/ui/dialog";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader as DHeader,
+  DialogTitle as DTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Switch } from "@/components/ui/switch";
 import { Pencil } from "lucide-react";
 import { notFound } from "next/navigation";
 
 export default function CategoriesPage() {
   const { isLoading, isOwner } = useRole();
-  if(!isOwner) return notFound();
-  const cats = useQuery(api.orders.listAllCategories, {});
+  // Always call hooks; use stable positions and gate after
+  const cats = useQuery(
+    api.orders.listAllCategories,
+    isLoading ? (undefined as any) : {},
+  );
   const createCat = useMutation(api.orders.createCategory);
   const toggleActive = useMutation(api.orders.toggleCategoryActive);
   const updateCat = useMutation(api.orders.updateCategory);
@@ -28,9 +46,13 @@ export default function CategoriesPage() {
   const [slug, setSlug] = useState("");
   const [msg, setMsg] = useState<string | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
-  const [pendingToggle, setPendingToggle] = useState<{ id: string; next: boolean } | null>(null);
+  const [pendingToggle, setPendingToggle] = useState<{
+    id: string;
+    next: boolean;
+  } | null>(null);
 
   if (isLoading) return <div className="p-4">Loading…</div>;
+  if (!isOwner) return notFound();
 
   const onCreate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -58,19 +80,32 @@ export default function CategoriesPage() {
               <DHeader>
                 <DTitle>Add Category</DTitle>
               </DHeader>
-              <form className="grid grid-cols-1 md:grid-cols-3 gap-3" onSubmit={onCreate}>
+              <form
+                className="grid grid-cols-1 md:grid-cols-3 gap-3"
+                onSubmit={onCreate}
+              >
                 <div>
                   <Label>Name</Label>
-                  <Input value={name} onChange={(e) => setName(e.target.value)} />
+                  <Input
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                  />
                 </div>
                 <div>
                   <Label>Slug</Label>
-                  <Input value={slug} onChange={(e) => setSlug(e.target.value)} />
+                  <Input
+                    value={slug}
+                    onChange={(e) => setSlug(e.target.value)}
+                  />
                 </div>
                 <div className="flex items-end">
                   <Button type="submit">Create</Button>
                 </div>
-                {msg && <div className="md:col-span-3 text-sm text-muted-foreground">{msg}</div>}
+                {msg && (
+                  <div className="md:col-span-3 text-sm text-muted-foreground">
+                    {msg}
+                  </div>
+                )}
               </form>
             </DialogContent>
           </Dialog>
@@ -82,14 +117,19 @@ export default function CategoriesPage() {
           </CardHeader>
           <CardContent className="space-y-2">
             {cats?.map((c: any) => (
-              <div key={c._id} className="flex items-center justify-between rounded border p-3">
+              <div
+                key={c._id}
+                className="flex items-center justify-between rounded border p-3"
+              >
                 <div className="space-y-1">
                   <div className="font-medium">{c.name}</div>
                   <div className="text-xs text-muted-foreground">{c.slug}</div>
                 </div>
                 <div className="flex items-center gap-3">
                   <div className="flex items-center gap-2">
-                    <span className="text-xs text-muted-foreground">{c.isActive ? "Active" : "Inactive"}</span>
+                    <span className="text-xs text-muted-foreground">
+                      {c.isActive ? "Active" : "Inactive"}
+                    </span>
                     <Switch
                       checked={c.isActive}
                       onCheckedChange={(val) => {
@@ -100,7 +140,11 @@ export default function CategoriesPage() {
                   </div>
                   <Dialog>
                     <DialogTrigger asChild>
-                      <Button size="sm" variant="outline" aria-label="Edit category">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        aria-label="Edit category"
+                      >
                         <Pencil className="h-4 w-4" />
                       </Button>
                     </DialogTrigger>
@@ -128,7 +172,9 @@ export default function CategoriesPage() {
             <AlertDialogHeader>
               <AlertDialogTitle>Confirm status change</AlertDialogTitle>
               <AlertDialogDescription>
-                {pendingToggle?.next ? "Activate this category?" : "Deactivate this category?"}
+                {pendingToggle?.next
+                  ? "Activate this category?"
+                  : "Deactivate this category?"}
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
@@ -136,7 +182,10 @@ export default function CategoriesPage() {
               <AlertDialogAction
                 onClick={async () => {
                   if (pendingToggle) {
-                    await toggleActive({ categoryId: pendingToggle.id as any, isActive: pendingToggle.next });
+                    await toggleActive({
+                      categoryId: pendingToggle.id as any,
+                      isActive: pendingToggle.next,
+                    });
                   }
                   setPendingToggle(null);
                 }}
@@ -151,7 +200,17 @@ export default function CategoriesPage() {
   );
 }
 
-function EditCategoryForm({ id, initialName, initialSlug, onSave }: { id: string; initialName: string; initialSlug: string; onSave: (name: string, slug: string) => Promise<void> }) {
+function EditCategoryForm({
+  id,
+  initialName,
+  initialSlug,
+  onSave,
+}: {
+  id: string;
+  initialName: string;
+  initialSlug: string;
+  onSave: (name: string, slug: string) => Promise<void>;
+}) {
   const [name, setName] = useState(initialName);
   const [slug, setSlug] = useState(initialSlug);
   const [saving, setSaving] = useState(false);
@@ -182,11 +241,13 @@ function EditCategoryForm({ id, initialName, initialSlug, onSave }: { id: string
         <Input value={slug} onChange={(e) => setSlug(e.target.value)} />
       </div>
       <div className="flex items-end">
-        <Button type="submit" disabled={saving}>{saving ? "Saving…" : "Save"}</Button>
+        <Button type="submit" disabled={saving}>
+          {saving ? "Saving…" : "Save"}
+        </Button>
       </div>
-      {msg && <div className="md:col-span-3 text-sm text-muted-foreground">{msg}</div>}
+      {msg && (
+        <div className="md:col-span-3 text-sm text-muted-foreground">{msg}</div>
+      )}
     </form>
   );
 }
-
-
