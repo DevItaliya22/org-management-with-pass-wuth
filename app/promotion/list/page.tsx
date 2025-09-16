@@ -8,18 +8,27 @@ import { useRole } from "@/hooks/use-role";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 
 export default function PromotionRequestsPage() {
-  const role = useRole();
-  const canView = !!role.isOwner;
-
-  const requests = useQuery(api.teams.listPromotionRequests, {} as any);
+  const { isLoading, isOwner } = useRole();
+  const requests = useQuery(
+    api.teams.listPromotionRequests,
+    isLoading ? (undefined as any) : ({} as any),
+  );
   const review = useMutation(api.teams.reviewPromotionRequest);
   const pending = (requests ?? []).filter((r) => r.status === "pending");
   const history = (requests ?? []).filter((r) => r.status !== "pending");
 
-  if (!canView) return notFound();
+  if (isLoading) return null;
+  if (!isOwner) return notFound();
 
   return (
     <DashboardLayout>
@@ -42,13 +51,33 @@ export default function PromotionRequestsPage() {
                 <TableBody>
                   {pending.map((r) => (
                     <TableRow key={r._id}>
-                      <TableCell className="font-medium">{r.teamName}</TableCell>
+                      <TableCell className="font-medium">
+                        {r.teamName}
+                      </TableCell>
                       <TableCell>{r.requesterName}</TableCell>
-                      <TableCell className="text-right">{new Date(r.requestedAt).toLocaleString()}</TableCell>
+                      <TableCell className="text-right">
+                        {new Date(r.requestedAt).toLocaleString()}
+                      </TableCell>
                       <TableCell className="text-right">
                         <div className="flex items-center justify-end gap-2">
-                          <Button size="sm" className="bg-green-600 text-white hover:bg-green-600" onClick={() => review({ requestId: r._id, approve: true })}>Approve</Button>
-                          <Button size="sm" variant="destructive" onClick={() => review({ requestId: r._id, approve: false })}>Reject</Button>
+                          <Button
+                            size="sm"
+                            className="bg-green-600 text-white hover:bg-green-600"
+                            onClick={() =>
+                              review({ requestId: r._id, approve: true })
+                            }
+                          >
+                            Approve
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="destructive"
+                            onClick={() =>
+                              review({ requestId: r._id, approve: false })
+                            }
+                          >
+                            Reject
+                          </Button>
                         </div>
                       </TableCell>
                     </TableRow>
@@ -56,7 +85,9 @@ export default function PromotionRequestsPage() {
                 </TableBody>
               </Table>
             ) : (
-              <div className="text-sm text-muted-foreground">No pending requests.</div>
+              <div className="text-sm text-muted-foreground">
+                No pending requests.
+              </div>
             )}
           </CardContent>
         </Card>
@@ -79,11 +110,16 @@ export default function PromotionRequestsPage() {
                 <TableBody>
                   {history.map((r) => (
                     <TableRow key={r._id}>
-                      <TableCell className="font-medium">{r.teamName}</TableCell>
+                      <TableCell className="font-medium">
+                        {r.teamName}
+                      </TableCell>
                       <TableCell>{r.requesterName}</TableCell>
                       <TableCell>
                         {r.status === "approved" ? (
-                          <Badge variant="outline" className="bg-green-600 text-white hover:bg-green-600">
+                          <Badge
+                            variant="outline"
+                            className="bg-green-600 text-white hover:bg-green-600"
+                          >
                             {r.status}
                           </Badge>
                         ) : r.status === "rejected" ? (
@@ -92,13 +128,17 @@ export default function PromotionRequestsPage() {
                           <Badge variant="outline">{r.status}</Badge>
                         )}
                       </TableCell>
-                      <TableCell className="text-right">{new Date(r.requestedAt).toLocaleString()}</TableCell>
+                      <TableCell className="text-right">
+                        {new Date(r.requestedAt).toLocaleString()}
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
               </Table>
             ) : (
-              <div className="text-sm text-muted-foreground">No past requests.</div>
+              <div className="text-sm text-muted-foreground">
+                No past requests.
+              </div>
             )}
           </CardContent>
         </Card>

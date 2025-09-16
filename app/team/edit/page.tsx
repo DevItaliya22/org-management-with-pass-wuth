@@ -33,10 +33,9 @@ import { Id } from "@/convex/_generated/dataModel";
 import Link from "next/link";
 
 export default function TeamManagementPage() {
-  const role = useRole();
-  const isAdmin = role?.isResellerAdmin;
-
-  const team = role?.session?.team;
+  const { isLoading, isResellerAdmin, session } = useRole();
+  const isAdmin = isResellerAdmin;
+  const team = session?.team;
   const [name, setName] = useState(team?.name ?? "");
   const [slug, setSlug] = useState(team?.slug ?? "");
   const [msg, setMsg] = useState<string | null>(null);
@@ -49,6 +48,9 @@ export default function TeamManagementPage() {
     api.teams.getTeamMembers,
     team?._id ? { teamId: team._id } : "skip",
   );
+
+  if (isLoading) return null;
+  if (!isAdmin) return notFound();
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -79,8 +81,6 @@ export default function TeamManagementPage() {
       console.error("Failed to update member status:", err);
     }
   };
-
-  if (!isAdmin) return notFound();
 
   return (
     <DashboardLayout>

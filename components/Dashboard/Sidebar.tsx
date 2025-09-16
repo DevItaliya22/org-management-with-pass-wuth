@@ -4,8 +4,6 @@ import { cn } from "@/lib/utils";
 import { Home, UserPlus2, Users, ShieldCheck, Plus, Tags } from "lucide-react";
 import { usePathname } from "next/navigation";
 import Link from "next/link";
-import { useQuery } from "convex/react";
-import { api } from "@/convex/_generated/api";
 import { useRole } from "@/hooks/use-role";
 
 interface SidebarProps {
@@ -14,8 +12,8 @@ interface SidebarProps {
 
 export function Sidebar({ className }: SidebarProps) {
   const pathname = usePathname();
-  const role = useRole();
-  console.log(role)
+  const { isLoading, isOwner, isStaff, isResellerAdmin, isResellerMember } =
+    useRole();
 
   const items: Array<{ name: string; href: string; icon: any }> = [
     {
@@ -25,16 +23,16 @@ export function Sidebar({ className }: SidebarProps) {
     },
   ];
 
-  if (role.isOwner) {
+  if (!isLoading && isOwner) {
     items.push({
       name: "Promotion List",
       href: "/promotion/list",
       icon: ShieldCheck,
-    }); 
+    });
     items.push({
       name: "Staff Management",
       href: "/staff/management",
-      icon: UserPlus2,  
+      icon: UserPlus2,
     });
     items.push({
       name: "Categories",
@@ -51,9 +49,9 @@ export function Sidebar({ className }: SidebarProps) {
       href: "/owner/disputes",
       icon: ShieldCheck,
     });
-  } else if (role.isStaff) {
+  } else if (!isLoading && isStaff) {
     // Dashboard only
-     items.push({
+    items.push({
       name: "Queue",
       href: "/staff/queue",
       icon: Users,
@@ -64,7 +62,7 @@ export function Sidebar({ className }: SidebarProps) {
       icon: Users,
      })
   } else {
-    if (role.isResellerAdmin) {
+    if (!isLoading && isResellerAdmin) {
       items.push({ name: "Edit Team Name", href: "/team/edit", icon: Users });
       items.push({
         name: "Team Invitations",
@@ -81,7 +79,7 @@ export function Sidebar({ className }: SidebarProps) {
         href: "/orders/new",
         icon: Plus,
       });
-    } else if (role.isResellerMember) {
+    } else if (!isLoading && isResellerMember) {
       // items.push({ name: "Promotion", href: "/promotion", icon: ShieldCheck });
       items.push({
         name: "Team Requests",
@@ -97,10 +95,14 @@ export function Sidebar({ className }: SidebarProps) {
         name: "Create Order",
         href: "/orders/new",
         icon: Plus,
-      })
+      });
     } else {
       // Default member
-      items.push({ name: "Promotion", href: "/promotion/request", icon: ShieldCheck });
+      items.push({
+        name: "Promotion",
+        href: "/promotion/request",
+        icon: ShieldCheck,
+      });
       items.push({
         name: "Team Requests",
         href: "/team/requests",
