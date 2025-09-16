@@ -159,8 +159,8 @@ export const requestPromotion = mutation({
       .filter((q) =>
         q.and(
           q.eq(q.field("requesterUserId"), userId),
-          q.eq(q.field("status"), "pending")
-        )
+          q.eq(q.field("status"), "pending"),
+        ),
       )
       .first();
     if (existing) return existing._id;
@@ -176,12 +176,15 @@ export const requestPromotion = mutation({
   },
 });
 
-
 // Owner: List promotion requests with populated names
 export const listPromotionRequests = query({
   args: {
     status: v.optional(
-      v.union(v.literal("pending"), v.literal("approved"), v.literal("rejected"))
+      v.union(
+        v.literal("pending"),
+        v.literal("approved"),
+        v.literal("rejected"),
+      ),
     ),
   },
   returns: v.array(
@@ -193,13 +196,16 @@ export const listPromotionRequests = query({
       requesterUserId: v.id("users"),
       requesterName: v.string(),
       requestedAt: v.number(),
-      status: v.union(v.literal("pending"), v.literal("approved"), v.literal("rejected")),
-    })
+      status: v.union(
+        v.literal("pending"),
+        v.literal("approved"),
+        v.literal("rejected"),
+      ),
+    }),
   ),
   handler: async (ctx, args) => {
     const rows = args.status
-      ? await ctx
-          .db
+      ? await ctx.db
           .query("adminPromotionRequests")
           .withIndex("by_status", (q) => q.eq("status", args.status!))
           .collect()
@@ -225,7 +231,10 @@ export const listPromotionRequests = query({
         teamId: r.teamId,
         teamName: team?.name ?? "Unknown Team",
         requesterUserId: r.requesterUserId,
-        requesterName: (requester?.name as string) ?? (requester as any)?.email ?? "Unknown User",
+        requesterName:
+          (requester?.name as string) ??
+          (requester as any)?.email ??
+          "Unknown User",
         requestedAt: r.requestedAt,
         status: r.status,
       });
@@ -244,8 +253,12 @@ export const listMyPromotionRequests = query({
       teamId: v.id("teams"),
       teamName: v.string(),
       requestedAt: v.number(),
-      status: v.union(v.literal("pending"), v.literal("approved"), v.literal("rejected")),
-    })
+      status: v.union(
+        v.literal("pending"),
+        v.literal("approved"),
+        v.literal("rejected"),
+      ),
+    }),
   ),
   handler: async (ctx) => {
     const userId = await getAuthUserId(ctx);
@@ -318,7 +331,17 @@ export const inviteToTeam = mutation({
 
 // List invitations for admin's team
 export const listTeamInvitations = query({
-  args: { teamId: v.id("teams"), status: v.optional(v.union(v.literal("pending"), v.literal("accepted"), v.literal("rejected"), v.literal("expired"))) },
+  args: {
+    teamId: v.id("teams"),
+    status: v.optional(
+      v.union(
+        v.literal("pending"),
+        v.literal("accepted"),
+        v.literal("rejected"),
+        v.literal("expired"),
+      ),
+    ),
+  },
   returns: v.array(
     v.object({
       _creationTime: v.number(),
@@ -327,12 +350,17 @@ export const listTeamInvitations = query({
       invitedEmail: v.string(),
       invitedByUserId: v.id("users"),
       invitedAt: v.number(),
-      status: v.union(v.literal("pending"), v.literal("accepted"), v.literal("rejected"), v.literal("expired")),
+      status: v.union(
+        v.literal("pending"),
+        v.literal("accepted"),
+        v.literal("rejected"),
+        v.literal("expired"),
+      ),
       acceptedByUserId: v.optional(v.id("users")),
       acceptedAt: v.optional(v.number()),
       expiresAt: v.number(),
       invitationToken: v.string(),
-    })
+    }),
   ),
   handler: async (ctx, args) => {
     let q = ctx.db
@@ -358,12 +386,17 @@ export const listMyInvitations = query({
       invitedByUserId: v.id("users"),
       invitedByEmail: v.string(),
       invitedAt: v.number(),
-      status: v.union(v.literal("pending"), v.literal("accepted"), v.literal("rejected"), v.literal("expired")),
+      status: v.union(
+        v.literal("pending"),
+        v.literal("accepted"),
+        v.literal("rejected"),
+        v.literal("expired"),
+      ),
       acceptedByUserId: v.optional(v.id("users")),
       acceptedAt: v.optional(v.number()),
       expiresAt: v.number(),
       invitationToken: v.string(),
-    })
+    }),
   ),
   handler: async (ctx) => {
     const userId = await getAuthUserId(ctx);
@@ -372,7 +405,9 @@ export const listMyInvitations = query({
     if (!user) return [];
     const rows = await ctx.db
       .query("teamInvitationRequests")
-      .withIndex("by_invited_email", (q) => q.eq("invitedEmail", user.email.toLowerCase()))
+      .withIndex("by_invited_email", (q) =>
+        q.eq("invitedEmail", user.email.toLowerCase()),
+      )
       .collect();
     const results: Array<{
       _creationTime: number;
@@ -423,7 +458,8 @@ export const acceptInvitation = mutation({
     if (!userId) throw new Error("Not authenticated");
     const invite = await ctx.db.get(args.invitationId);
     if (!invite) throw new Error("Invitation not found");
-    if (invite.status !== "pending") throw new Error("Invitation already handled");
+    if (invite.status !== "pending")
+      throw new Error("Invitation already handled");
     if (invite.expiresAt < Date.now()) {
       await ctx.db.patch(args.invitationId, { status: "expired" });
       throw new Error("Invitation expired");
@@ -448,7 +484,9 @@ export const acceptInvitation = mutation({
     }
 
     // Ensure membership for the invited team is active
-    const invitedMembership = allMemberships.find((m) => m.teamId === invite.teamId);
+    const invitedMembership = allMemberships.find(
+      (m) => m.teamId === invite.teamId,
+    );
     if (invitedMembership) {
       await ctx.db.patch(invitedMembership._id, {
         isActive: true,
@@ -480,15 +518,24 @@ export const rejectInvitation = mutation({
     if (!userId) throw new Error("Not authenticated");
     const invite = await ctx.db.get(args.invitationId);
     if (!invite) throw new Error("Invitation not found");
-    if (invite.status !== "pending") throw new Error("Invitation already handled");
-    await ctx.db.patch(args.invitationId, { status: "rejected", acceptedByUserId: userId, acceptedAt: Date.now() });
+    if (invite.status !== "pending")
+      throw new Error("Invitation already handled");
+    await ctx.db.patch(args.invitationId, {
+      status: "rejected",
+      acceptedByUserId: userId,
+      acceptedAt: Date.now(),
+    });
     return null;
   },
 });
 
 // Update team details (admin only)
 export const updateTeam = mutation({
-  args: { teamId: v.id("teams"), name: v.string(), slug: v.optional(v.string()) },
+  args: {
+    teamId: v.id("teams"),
+    name: v.string(),
+    slug: v.optional(v.string()),
+  },
   returns: v.null(),
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
@@ -498,11 +545,211 @@ export const updateTeam = mutation({
       .withIndex("by_user", (q) => q.eq("userId", userId))
       .filter((q) => q.eq(q.field("teamId"), args.teamId))
       .first();
-    if (!membership || membership.role !== "admin") throw new Error("Only admins can update team");
+    if (!membership || membership.role !== "admin")
+      throw new Error("Only admins can update team");
     const now = Date.now();
     const patch: any = { name: args.name, updatedAt: now };
     if (args.slug) patch.slug = args.slug;
     await ctx.db.patch(args.teamId, patch);
     return null;
+  },
+});
+
+// Get team members with user details (admin only)
+export const getTeamMembers = query({
+  args: { teamId: v.id("teams") },
+  returns: v.array(
+    v.object({
+      _id: v.id("resellerMembers"),
+      _creationTime: v.number(),
+      teamId: v.id("teams"),
+      userId: v.id("users"),
+      role: v.union(v.literal("admin"), v.literal("member")),
+      status: v.union(
+        v.literal("pending_invitation"),
+        v.literal("active_member"),
+        v.literal("suspended_member"),
+        v.literal("default_member"),
+      ),
+      isActive: v.boolean(),
+      isBlocked: v.boolean(),
+      createdAt: v.number(),
+      updatedAt: v.number(),
+      user: v.object({
+        _id: v.id("users"),
+        name: v.optional(v.string()),
+        email: v.string(),
+        role: v.optional(
+          v.union(
+            v.literal("owner"),
+            v.literal("reseller"),
+            v.literal("staff"),
+          ),
+        ),
+      }),
+    }),
+  ),
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+
+    // Check if user is admin of this team
+    const membership = await ctx.db
+      .query("resellerMembers")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .filter((q) => q.eq(q.field("teamId"), args.teamId))
+      .first();
+    if (!membership || membership.role !== "admin") {
+      throw new Error("Only team admins can view team members");
+    }
+
+    // Get all team members
+    const teamMembers = await ctx.db
+      .query("resellerMembers")
+      .withIndex("by_team", (q) => q.eq("teamId", args.teamId))
+      .collect();
+
+    // Get user details for each member
+    const membersWithUsers = await Promise.all(
+      teamMembers.map(async (member) => {
+        const user = await ctx.db.get(member.userId);
+        if (!user) {
+          throw new Error(`User not found for member ${member._id}`);
+        }
+        return {
+          ...member,
+          user: {
+            _id: user._id,
+            name: user.name,
+            email: user.email,
+            role: user.role,
+          },
+        };
+      }),
+    );
+
+    return membersWithUsers;
+  },
+});
+
+// Update member status (admin only)
+export const updateMemberStatus = mutation({
+  args: {
+    memberId: v.id("resellerMembers"),
+    isActive: v.optional(v.boolean()),
+    isBlocked: v.optional(v.boolean()),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+
+    // Get the member record
+    const member = await ctx.db.get(args.memberId);
+    if (!member) throw new Error("Member not found");
+
+    // Check if user is admin of this team
+    const adminMembership = await ctx.db
+      .query("resellerMembers")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .filter((q) => q.eq(q.field("teamId"), member.teamId))
+      .first();
+    if (!adminMembership || adminMembership.role !== "admin") {
+      throw new Error("Only team admins can update member status");
+    }
+
+    const now = Date.now();
+    const patch: any = { updatedAt: now };
+    if (args.isActive !== undefined) patch.isActive = args.isActive;
+    if (args.isBlocked !== undefined) patch.isBlocked = args.isBlocked;
+
+    await ctx.db.patch(args.memberId, patch);
+    return null;
+  },
+});
+
+// Get user details for team admin (admin only)
+export const getUserDetails = query({
+  args: { userId: v.id("users") },
+  returns: v.union(
+    v.object({
+      _id: v.id("users"),
+      name: v.optional(v.string()),
+      email: v.string(),
+      role: v.optional(
+        v.union(v.literal("owner"), v.literal("reseller"), v.literal("staff")),
+      ),
+      emailVerificationTime: v.optional(v.number()),
+      resellerMember: v.optional(
+        v.object({
+          _id: v.id("resellerMembers"),
+          teamId: v.id("teams"),
+          role: v.union(v.literal("admin"), v.literal("member")),
+          status: v.union(
+            v.literal("pending_invitation"),
+            v.literal("active_member"),
+            v.literal("suspended_member"),
+            v.literal("default_member"),
+          ),
+          isActive: v.boolean(),
+          isBlocked: v.boolean(),
+          createdAt: v.number(),
+          updatedAt: v.number(),
+        }),
+      ),
+    }),
+    v.null(),
+  ),
+  handler: async (ctx, args) => {
+    const currentUserId = await getAuthUserId(ctx);
+    if (!currentUserId) throw new Error("Not authenticated");
+
+    // Get the user details
+    const user = await ctx.db.get(args.userId);
+    if (!user) return null;
+
+    // Get user's reseller member record
+    const resellerMember = await ctx.db
+      .query("resellerMembers")
+      .withIndex("by_user", (q) => q.eq("userId", args.userId))
+      .filter((q) => q.eq(q.field("isActive"), true))
+      .first();
+
+    // Allow self access always. Otherwise require admin of same team.
+    if (currentUserId !== args.userId) {
+      if (resellerMember) {
+        const currentUserMembership = await ctx.db
+          .query("resellerMembers")
+          .withIndex("by_user", (q) => q.eq("userId", currentUserId))
+          .filter((q) => q.eq(q.field("teamId"), resellerMember.teamId))
+          .first();
+
+        if (!currentUserMembership || currentUserMembership.role !== "admin") {
+          throw new Error("You can only view details of users in your team");
+        }
+      } else {
+        throw new Error("User is not a member of any team");
+      }
+    }
+
+    return {
+      _id: user._id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      emailVerificationTime: user.emailVerificationTime,
+      resellerMember: resellerMember
+        ? {
+            _id: resellerMember._id,
+            teamId: resellerMember.teamId,
+            role: resellerMember.role,
+            status: resellerMember.status,
+            isActive: resellerMember.isActive,
+            isBlocked: resellerMember.isBlocked,
+            createdAt: resellerMember.createdAt,
+            updatedAt: resellerMember.updatedAt,
+          }
+        : undefined,
+    };
   },
 });

@@ -13,8 +13,16 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
-import { useQuery } from "convex/react";
-import { api } from "../../convex/_generated/api";
+import { useRole } from "@/hooks/use-role";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { SignOutButton } from "@/components/SignOutButton";
 
 interface HeaderProps {
   className?: string;
@@ -22,30 +30,25 @@ interface HeaderProps {
 
 export function Header({ className }: HeaderProps = {}) {
   const pathname = usePathname();
-  const sessionData = useQuery(api.session.getCurrentUserSession);
+  const roleState = useRole();
 
   // Get role information
   const getRoleDisplay = () => {
-    if (!sessionData) return { role: "Loading...", icon: User };
+    if (roleState.isLoading) return { label: "Loading...", icon: User };
 
-    const { user, resellerMember } = sessionData;
-    const userRole = user.role;
+    if (roleState.isOwner) return { label: "Owner", icon: Crown };
+    if (roleState.isStaff) return { label: "Staff", icon: Shield };
+    if (roleState.isResellerAdmin)
+      return { label: "Reseller Admin", icon: Users };
+    if (roleState.isResellerMember)
+      return { label: "Reseller Member", icon: User };
 
-    if (userRole === "owner") {
-      return { role: "Owner", icon: Crown };
-    } else if (userRole === "staff") {
-      return { role: "Staff", icon: Shield };
-    } else if (userRole === "reseller") {
-      if (resellerMember?.role === "admin") {
-        return { role: "Reseller Admin", icon: Users };
-      } else {
-        return { role: "Reseller Member", icon: User };
-      }
-    }
-    return { role: "User", icon: User };
+    // Fallbacks
+    if (roleState.isReseller) return { label: "Reseller", icon: Users };
+    return { label: "User", icon: User };
   };
 
-  const { role, icon: IconComponent } = getRoleDisplay();
+  const { label, icon: IconComponent } = getRoleDisplay();
 
   return (
     <header className="flex h-16 items-center justify-between bg-transparent px-6">
@@ -54,41 +57,49 @@ export function Header({ className }: HeaderProps = {}) {
       </div>
 
       <div className="flex items-center space-x-4">
-        <nav className="hidden md:flex items-center space-x-6">
-          <Link
-            href="/"
-            className={
-              pathname === "/"
-                ? "text-sm font-medium text-foreground"
-                : "text-sm font-medium text-muted-foreground hover:text-foreground transition-smooth"
-            }
-          >
-            Dashboard
-          </Link>
-          <Link
-            href="/reports"
-            className={
-              pathname === "/reports"
-                ? "text-sm font-medium text-foreground"
-                : "text-sm font-medium text-muted-foreground hover:text-foreground transition-smooth"
-            }
-          >
-            Reports
-          </Link>
-        </nav>
-
         <ThemeToggle />
-
-        <Button variant="ghost" size="icon" className="relative">
+        {/* 
+        <Button
+          variant="ghost"
+          size="icon"
+          className="relative"
+          aria-label="Notifications"
+        >
           <Bell className="h-5 w-5" />
           <span className="absolute -top-1 -right-1 h-3 w-3 bg-primary rounded-full"></span>
-        </Button>
+        </Button> */}
 
-        <Button variant="ghost" className="flex items-center space-x-2">
-          <IconComponent className="h-4 w-4" />
-          <span className="text-sm font-medium">{role}</span>
-          <ChevronDown className="h-4 w-4" />
-        </Button>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" className="flex items-center space-x-2">
+              <IconComponent className="h-4 w-4" />
+              <span className="text-sm font-medium">{label}</span>
+              <ChevronDown className="h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-44">
+            <DropdownMenuLabel>Account</DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem asChild>
+              <Link
+                href={
+                  roleState.session?.user
+                    ? `/teams/user/${roleState.session.user._id}`
+                    : "#"
+                }
+              >
+                <div className="flex items-center gap-2">
+                  <User className="h-4 w-4" />
+                  <span>Profile</span>
+                </div>
+              </Link>
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <div className="px-2 py-1.5">
+              <SignOutButton />
+            </div>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
     </header>
   );

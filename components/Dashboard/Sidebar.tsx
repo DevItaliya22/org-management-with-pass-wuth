@@ -26,17 +26,18 @@ export function Sidebar({ className }: SidebarProps) {
 
   if (role.isOwner) {
     items.push({
-      name: "Promotion Requests",
-      href: "/promotion/request",
+      name: "Promotion List",
+      href: "/promotion/list",
       icon: ShieldCheck,
-    });
+    }); 
     items.push({
-      name: "Staff Creation",
-      href: "/staff/creation",
+      name: "Staff Management",
+      href: "/staff/management",
       icon: UserPlus2,
     });
   } else if (role.isStaff) {
     // Dashboard only
+
   } else {
     if (role.isResellerAdmin) {
       items.push({ name: "Edit Team Name", href: "/team/edit", icon: Users });
@@ -53,6 +54,7 @@ export function Sidebar({ className }: SidebarProps) {
         icon: Users,
       });
     } else {
+      // Default member
       items.push({ name: "Promotion", href: "/promotion/request", icon: ShieldCheck });
       items.push({
         name: "Team Requests",

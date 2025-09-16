@@ -1,4 +1,4 @@
-import { action, internalMutation } from "./_generated/server";
+import { action, internalMutation, query, mutation } from "./_generated/server";
 import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { internal } from "./_generated/api";
@@ -55,4 +55,90 @@ export const finalizeStaffCreation = internalMutation({
   },
 });
 
+// Get all staff members with their user details
+export const getAllStaff = query({
+  args: {},
+  returns: v.array(
+    v.object({
+      _id: v.id("staff"),
+      _creationTime: v.number(), // System field automatically added by Convex
+      userId: v.id("users"),
+      status: v.union(
+        v.literal("online"),
+        v.literal("paused"),
+        v.literal("offline"),
+      ),
+      isActive: v.boolean(),
+      createdAt: v.number(),
+      updatedAt: v.number(),
+      user: v.object({
+        _id: v.id("users"),
+        name: v.optional(v.string()),
+        email: v.string(),
+        role: v.optional(
+          v.union(
+            v.literal("owner"),
+            v.literal("reseller"),
+            v.literal("staff"),
+          ),
+        ),
+      }),
+    }),
+  ),
+  handler: async (ctx) => {
+    const ownerUserId = await getAuthUserId(ctx);
+    if (!ownerUserId) throw new Error("Not authenticated");
 
+    // Get all staff records
+    const staffRecords = await ctx.db.query("staff").collect();
+
+    // Get user details for each staff member
+    const staffWithUsers = await Promise.all(
+      staffRecords.map(async (staff) => {
+        const user = await ctx.db.get(staff.userId);
+        if (!user) {
+          throw new Error(`User not found for staff ${staff._id}`);
+        }
+        return {
+          ...staff,
+          user: {
+            _id: user._id,
+            name: user.name,
+            email: user.email,
+            role: user.role,
+          },
+        };
+      }),
+    );
+
+    return staffWithUsers;
+  },
+});
+
+// Update staff member name
+export const updateStaffName = mutation({
+  args: {
+    userId: v.id("users"),
+    name: v.string(),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const ownerUserId = await getAuthUserId(ctx);
+    if (!ownerUserId) throw new Error("Not authenticated");
+
+    // Update the user's name
+    await ctx.db.patch(args.userId, { name: args.name });
+
+    // Update the staff record's updatedAt timestamp
+    const staffRecord = await ctx.db
+      .query("staff")
+      .withIndex("by_user", (q) => q.eq("userId", args.userId))
+      .unique();
+
+    if (staffRecord) {
+      await ctx.db.patch(staffRecord._id, { updatedAt: Date.now() });
+    }
+
+    return null;
+  },
+});
