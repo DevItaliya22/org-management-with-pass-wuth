@@ -13,9 +13,12 @@ import type {
   FilterApi,
   FunctionReference,
 } from "convex/server";
+import type * as access from "../access.js";
 import type * as auth from "../auth.js";
+import type * as cron from "../cron.js";
 import type * as http from "../http.js";
 import type * as lib_teamNames from "../lib/teamNames.js";
+import type * as orders from "../orders.js";
 import type * as otp_NodemailerOTP from "../otp/NodemailerOTP.js";
 import type * as otp_sendEmailAction from "../otp/sendEmailAction.js";
 import type * as session from "../session.js";
@@ -33,9 +36,12 @@ import type * as users from "../users.js";
  * ```
  */
 declare const fullApi: ApiFromModules<{
+  access: typeof access;
   auth: typeof auth;
+  cron: typeof cron;
   http: typeof http;
   "lib/teamNames": typeof lib_teamNames;
+  orders: typeof orders;
   "otp/NodemailerOTP": typeof otp_NodemailerOTP;
   "otp/sendEmailAction": typeof otp_sendEmailAction;
   session: typeof session;

@@ -33,6 +33,7 @@ export default function DashboardPage() {
           <p className="text-sm text-muted-foreground">Overview of your profile and team.</p>
         </div>
 
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <Card>
             <CardHeader className="pb-3">

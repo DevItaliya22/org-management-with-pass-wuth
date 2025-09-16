@@ -1,7 +1,7 @@
 "use client";
 
 import { cn } from "@/lib/utils";
-import { Home, UserPlus2, Users, ShieldCheck } from "lucide-react";
+import { Home, UserPlus2, Users, ShieldCheck, Plus } from "lucide-react";
 import { usePathname } from "next/navigation";
 import Link from "next/link";
 import { useQuery } from "convex/react";
@@ -46,6 +46,11 @@ export function Sidebar({ className }: SidebarProps) {
         href: "/team/invitations",
         icon: Users,
       });
+      items.push({
+        name: "Create Order",
+        href: "/orders/new",
+        icon: Plus,
+      });
     } else if (role.isResellerMember) {
       // items.push({ name: "Promotion", href: "/promotion", icon: ShieldCheck });
       items.push({
@@ -53,6 +58,11 @@ export function Sidebar({ className }: SidebarProps) {
         href: "/team/requests",
         icon: Users,
       });
+      items.push({
+        name: "Create Order",
+        href: "/orders/new",
+        icon: Plus,
+      })
     } else {
       // Default member
       items.push({ name: "Promotion", href: "/promotion/request", icon: ShieldCheck });
