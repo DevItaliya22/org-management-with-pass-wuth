@@ -322,6 +322,19 @@ export const toggleCategoryActive = mutation({
   },
 });
 
+export const updateCategory = mutation({
+  args: { categoryId: v.id("categories"), name: v.string(), slug: v.string() },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const { user } = await requireViewer(ctx);
+    if (user.role !== "owner") throw new Error("Not authorized");
+    const cat = await ctx.db.get(args.categoryId);
+    if (!cat) throw new Error("Category not found");
+    await ctx.db.patch(args.categoryId, { name: args.name, slug: args.slug, updatedAt: Date.now() });
+    return null;
+  },
+});
+
 export const pickOrder = mutation({
   args: { orderId: v.id("orders") },
   returns: v.null(),

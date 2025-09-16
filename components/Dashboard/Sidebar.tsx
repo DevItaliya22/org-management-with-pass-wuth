@@ -1,7 +1,7 @@
 "use client";
 
 import { cn } from "@/lib/utils";
-import { Home, UserPlus2, Users, ShieldCheck, Plus } from "lucide-react";
+import { Home, UserPlus2, Users, ShieldCheck, Plus, Tags } from "lucide-react";
 import { usePathname } from "next/navigation";
 import Link from "next/link";
 import { useQuery } from "convex/react";
@@ -34,6 +34,11 @@ export function Sidebar({ className }: SidebarProps) {
       name: "Staff Management",
       href: "/staff/management",
       icon: UserPlus2,
+    });
+    items.push({
+      name: "Categories",
+      href: "/categories",
+      icon: Tags,
     });
   } else if (role.isStaff) {
     // Dashboard only
