@@ -16,14 +16,26 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "
 import { Textarea } from "@/components/ui/textarea";
 
 export default function OrderDetailsPage() {
-  const {isReseller, isOwner} = useRole();
-  if(!isReseller && !isOwner) return notFound();
+  const {isReseller, isOwner, isStaff} = useRole();
+  if(!isReseller && !isOwner && !isStaff) return notFound();
   const params = useParams();
   const orderId = params?.orderId as string | undefined;
   const router = useRouter();
 
   const order = useQuery(api.orders.getOrderById, orderId ? { orderId } as any : "skip");
   const disputes = useQuery(api.orders.getDisputesByOrder, orderId ? { orderId } as any : "skip");
+  const disputeUserIds: string[] =
+    disputes && disputes.length > 0
+      ? Array.from(new Set(disputes.map((d: any) => d.raisedByUserId)))
+      : [];
+  const disputeUserLabels = useQuery(
+    api.orders.getUserLabels,
+    disputeUserIds.length ? ({ userIds: disputeUserIds } as any) : ("skip" as any)
+  );
+  const disputeRoles = useQuery(
+    api.orders.getUserTeamRoles,
+    order && disputeUserIds.length ? ({ teamId: order.teamId, userIds: disputeUserIds } as any) : ("skip" as any)
+  );
  
   const completeOrder = useMutation(api.orders.completeOrder);
   const raiseDispute = useMutation(api.orders.raiseDispute);
@@ -119,6 +131,12 @@ export default function OrderDetailsPage() {
                   <span className="col-span-2">{order.sla}</span>
                   <span className="text-muted-foreground">Status</span>
                   <span className="col-span-2 font-medium">{order.status}</span>
+                  {order.status === "on_hold" && order.holdReason && (
+                    <>
+                      <span className="text-muted-foreground">Hold Reason</span>
+                      <span className="col-span-2 break-words">{order.holdReason}</span>
+                    </>
+                  )}
                 </div>
               </section>
               {order.fulfilment && (
@@ -138,7 +156,7 @@ export default function OrderDetailsPage() {
                   
                 </>
               )}
-              {isOwner && disputes && disputes.length > 0 && (
+              {(isOwner || isReseller) && disputes && disputes.length > 0 && (
                 <>
                   <Separator />
                   <section className="space-y-2">
@@ -151,6 +169,10 @@ export default function OrderDetailsPage() {
                             <span className="text-xs text-muted-foreground">{new Date(d.createdAt).toLocaleString()}</span>
                           </div>
                           <div className="mt-1">Reason: {d.reason}</div>
+                          <div className="mt-1 text-xs text-muted-foreground">
+                            Raised by: {disputeUserLabels?.[d.raisedByUserId]?.name ?? disputeUserLabels?.[d.raisedByUserId]?.email ?? "User"}
+                            {disputeRoles?.[d.raisedByUserId] && ` (${disputeRoles[d.raisedByUserId]})`}
+                          </div>
                           {d.adjustmentAmountUsd && (
                             <div className="mt-1">Adjustment: ${d.adjustmentAmountUsd}</div>
                           )}

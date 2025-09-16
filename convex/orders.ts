@@ -265,6 +265,67 @@ export const listMyWork = query({
   },
 });
 
+// Picked orders assigned to current staff (status strictly 'picked')
+export const listPickedOrders = query({
+  args: { paginationOpts: paginationOptsValidator },
+  returns: v.any(),
+  handler: async (ctx, args) => {
+    const { userId, user } = await requireViewer(ctx);
+    if (user.role !== "staff") throw new Error("Not authorized");
+    const page = await ctx.db
+      .query("orders")
+      .withIndex("by_picked_by", (q) => q.eq("pickedByStaffUserId", userId))
+      .order("desc")
+      .paginate(args.paginationOpts);
+    // filter to only status 'picked'
+    page.page = page.page.filter((o: Doc<"orders">) => o.status === "picked");
+    return page;
+  },
+});
+
+// Role-aware single query for unified orders page
+export const listOrdersForViewer = query({
+  args: { paginationOpts: paginationOptsValidator },
+  returns: v.any(),
+  handler: async (ctx, args) => {
+    const { userId, user } = await requireViewer(ctx);
+    if (user.role === "owner") {
+      return await ctx.db
+        .query("orders")
+        .withIndex("by_createdAt", (q) => q.gte("createdAt", 0))
+        .order("desc")
+        .paginate(args.paginationOpts);
+    }
+    if (user.role === "reseller") {
+      const membership = await ctx.db
+        .query("resellerMembers")
+        .withIndex("by_user", (q: any) => q.eq("userId", userId))
+        .first();
+      if (!membership || membership.status !== "active_member") {
+        return await ctx.db
+          .query("orders")
+          .withIndex("by_created_by", (q) => q.eq("createdByUserId", userId))
+          .order("desc")
+          .paginate(args.paginationOpts);
+      }
+      if (membership.role === "admin") {
+        return await ctx.db
+          .query("orders")
+          .withIndex("by_team", (q) => q.eq("teamId", membership.teamId))
+          .order("desc")
+          .paginate(args.paginationOpts);
+      }
+      return await ctx.db
+        .query("orders")
+        .withIndex("by_created_by", (q) => q.eq("createdByUserId", userId))
+        .order("desc")
+        .paginate(args.paginationOpts);
+    }
+    // Other roles: return empty page
+    return { page: [], isDone: true, continueCursor: null } as any;
+  },
+});
+
 export const listActiveCategories = query({
   args: {},
   returns: v.any(),
@@ -306,6 +367,28 @@ export const getUserLabels = query({
       }
     }
     return result as any;
+  },
+});
+
+export const getUserTeamRoles = query({
+  args: { teamId: v.id("teams"), userIds: v.array(v.id("users")) },
+  returns: v.record(
+    v.id("users"),
+    v.union(v.literal("admin"), v.literal("member"))
+  ),
+  handler: async (ctx, args) => {
+    const out: Record<string, "admin" | "member"> = {};
+    for (const uid of args.userIds) {
+      const membership = await ctx.db
+        .query("resellerMembers")
+        .withIndex("by_user", (q: any) => q.eq("userId", uid))
+        .filter((q: any) => q.eq(q.field("teamId"), args.teamId))
+        .first();
+      if (membership && membership.status === "active_member") {
+        out[uid] = membership.role;
+      }
+    }
+    return out as any;
   },
 });
 
@@ -580,7 +663,9 @@ export const raiseDispute = mutation({
     if (user.role !== "reseller") throw new Error("Not authorized");
     const order = await ctx.db.get(args.orderId);
     if (!order) throw new Error("Order not found");
-    if (order.status !== "completed") throw new Error("Can dispute only after completion");
+    if (!(order.status === "fulfil_submitted")) {
+      throw new Error("Can dispute only after fulfilment");
+    }
     // Member can dispute only if they created it; admin can dispute team order
     const membership = await ctx.db
       .query("resellerMembers")
@@ -600,6 +685,8 @@ export const raiseDispute = mutation({
       status: "open",
       createdAt: now,
     });
+    // Update order status to disputed
+    await ctx.db.patch(args.orderId, { status: "disputed", updatedAt: now });
     await ctx.db.insert("auditLogs", {
       actorUserId: userId,
       entity: "order",
@@ -643,7 +730,20 @@ export const getDisputesByOrder = query({
       .withIndex("by_order", (q) => q.eq("orderId", args.orderId))
       .order("desc")
       .collect();
-    return disputes;
+    return disputes.map((d) => ({
+      _id: d._id,
+      orderId: d.orderId,
+      teamId: d.teamId,
+      raisedByUserId: d.raisedByUserId,
+      reason: d.reason,
+      attachmentFileIds: d.attachmentFileIds,
+      status: d.status,
+      createdAt: d.createdAt,
+      resolvedByUserId: d.resolvedByUserId,
+      resolvedAt: d.resolvedAt,
+      resolutionNotes: d.resolutionNotes,
+      adjustmentAmountUsd: d.adjustmentAmountUsd,
+    }));
   },
 });
 

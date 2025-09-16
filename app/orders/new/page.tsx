@@ -64,6 +64,15 @@ export default function NewOrderPage() {
         currencyOverride: undefined,
       });
       setMsg("Order created");
+      // Reset form fields after successful creation
+      setCategoryId(undefined);
+      setCartValueUsd("");
+      setMerchant("");
+      setCustomerName("");
+      setCountry("");
+      setCity("");
+      setContact("");
+      setSla("asap");
     } catch (e: any) {
       setMsg(e?.message || "Failed to create order");
     } finally {

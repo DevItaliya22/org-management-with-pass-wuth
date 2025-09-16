@@ -41,11 +41,26 @@ export function Sidebar({ className }: SidebarProps) {
       href: "/categories",
       icon: Tags,
     });
+    items.push({
+      name: "Orders",
+      href: "/orders",
+      icon: Users,
+    });
+    items.push({
+      name: "Disputes",
+      href: "/owner/disputes",
+      icon: ShieldCheck,
+    });
   } else if (role.isStaff) {
     // Dashboard only
      items.push({
       name: "Queue",
       href: "/staff/queue",
+      icon: Users,
+     })
+     items.push({
+      name: "My Orders",
+      href: "/staff/myorders",
       icon: Users,
      })
   } else {

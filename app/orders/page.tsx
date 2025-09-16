@@ -7,34 +7,12 @@ import Link from "next/link";
 import DashboardLayout from "@/components/Dashboard/DashboardLayout";
 
 export default function OrdersPage() {
-  const { isLoading, isOwner, isReseller, isResellerAdmin, session } = useRole();
+  const { isLoading, isResellerAdmin, session } = useRole();
 
-  const ownerPage = useQuery(
-    api.orders.listOrdersForOwner,
-    isOwner
-      ? {
-          paginationOpts: { numItems: 20, cursor: null },
-          status: undefined,
-          teamId: undefined,
-          categoryId: undefined,
-        }
-      : "skip"
-  );
-
-  const resellerPage = useQuery(
-    api.orders.listOrdersForReseller,
-    isReseller
-      ? {
-          paginationOpts: { numItems: 20, cursor: null },
-          teamId: isResellerAdmin ? (session?.resellerMember?.teamId as any) : undefined,
-        }
-      : "skip"
-  );
-
-  // Always call hooks before any early returns to keep order stable
-  const page = isOwner ? ownerPage : resellerPage;
-  const userIds: string[] = isReseller && isResellerAdmin
-    ? Array.from(new Set((resellerPage?.page ?? []).map((o: any) => o.createdByUserId)))
+  // Single role-aware query handled on the backend
+  const page = useQuery(api.orders.listOrdersForViewer, { paginationOpts: { numItems: 20, cursor: null } });
+  const userIds: string[] = isResellerAdmin
+    ? Array.from(new Set((page?.page ?? []).map((o: any) => o.createdByUserId)))
     : [];
   const userLabels = useQuery(api.orders.getUserLabels, { userIds } as any);
 

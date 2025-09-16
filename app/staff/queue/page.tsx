@@ -124,22 +124,7 @@ export default function StaffQueuePage() {
                     <Badge variant={col.id === "queue" ? "secondary" : "default"}>${item._raw?.cartValueUsd}</Badge>
                   </div>
                   <div className="text-xs text-muted-foreground truncate">{item._raw?.customerName} • {item._raw?.sla}</div>
-                  {col.id === "queue" && (
-                    <div className="mt-2 flex gap-2">
-                      <Button size="sm" onClick={() => pick({ orderId: item.id as any })}>Pick</Button>
-                      <Button size="sm" variant="outline" onClick={() => pass({ orderId: item.id as any, reason: "Not suitable" })}>Pass</Button>
-                    </div>
-                  )}
-                  {col.id === "in_progress" && (
-                    <div className="mt-2 flex gap-2">
-                      <Button size="sm" variant="outline" onClick={() => hold({ orderId: item.id as any, reason: "Waiting for info" })}>Hold</Button>
-                    </div>
-                  )}
-                  {col.id === "on_hold" && (
-                    <div className="mt-2 flex gap-2">
-                      <Button size="sm" onClick={() => resume({ orderId: item.id as any })}>Resume</Button>
-                    </div>
-                  )}
+                  
                 </KanbanCard>
               )}
             </KanbanCards>
