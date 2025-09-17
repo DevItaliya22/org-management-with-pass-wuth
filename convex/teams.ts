@@ -96,6 +96,7 @@ export const getUserTeam = mutation({
   },
 });
 
+// TODO
 // Approve or reject a promotion request (Owner only)
 export const reviewPromotionRequest = mutation({
   args: {
@@ -131,6 +132,7 @@ export const reviewPromotionRequest = mutation({
 
       await ctx.db.patch(member._id, {
         role: "admin",
+        status: "team_joined",
         isActive: true,
         approvedByUserId: reviewerUserId,
         approvedAt: now,
@@ -496,6 +498,7 @@ export const acceptInvitation = mutation({
       await ctx.db.patch(invitedMembership._id, {
         isActive: true,
         isBlocked: false,
+        status: "team_joined",
         updatedAt: now,
       });
     } else {
@@ -503,7 +506,7 @@ export const acceptInvitation = mutation({
         teamId: invite.teamId,
         userId,
         role: "member",
-        status: "default_member",
+        status: "team_joined",
         isActive: true,
         isBlocked: false,
         createdAt: now,
@@ -578,6 +581,7 @@ export const getTeamMembers = query({
       status: v.union(
         v.literal("pending_invitation"),
         v.literal("default_member"),
+        v.literal("team_joined"),
       ),
       isActive: v.boolean(),
       isBlocked: v.boolean(),
@@ -706,6 +710,7 @@ export const getUserDetails = query({
           status: v.union(
             v.literal("pending_invitation"),
             v.literal("default_member"),
+            v.literal("team_joined"),
           ),
           isActive: v.boolean(),
           isBlocked: v.boolean(),

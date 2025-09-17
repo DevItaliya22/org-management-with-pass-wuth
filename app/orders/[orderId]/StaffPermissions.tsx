@@ -79,10 +79,7 @@ export default function StaffPermissions({
           </div>
         )}
 
-        <div className="text-xs text-muted-foreground">
-          These team members can access this order. Contact the team admin to
-          modify permissions.
-        </div>
+        {/* Intentionally no footer for staff */}
       </section>
     </>
   );

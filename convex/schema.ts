@@ -15,7 +15,9 @@ export default defineSchema({
     role: v.optional(
       v.union(v.literal("owner"), v.literal("reseller"), v.literal("staff")),
     ),
-  }).index("email", ["email"]),
+  })
+    .index("email", ["email"])
+    .index("by_role", ["role"]),
 
   // Put reseller table here nd assign role in auth.ts
   teams: defineTable({
@@ -32,7 +34,8 @@ export default defineSchema({
     role: v.union(v.literal("admin"), v.literal("member")),
     status: v.union(
       v.literal("pending_invitation"), // pending => when user is invited by owner and he has not accepted the invitation
-      v.literal("default_member"), // default => when user is self added by sign-up page , means by default it will be this one when user logs in first time , then he can ask to be admin and if accepted then he will be active member and role will be admin
+      v.literal("default_member"), // default => when user is self added by sign-up page , means by default it will be this one when user logs in first time , then he can ask to be admin and if accepted then he will be active member and role will be admin,
+      v.literal("team_joined"), // when user is added by owner or admin of the team
     ),
     approvedByUserId: v.optional(v.id("users")), // Who approved this member (by which Owner)
     isActive: v.boolean(), // isActive => when user is active

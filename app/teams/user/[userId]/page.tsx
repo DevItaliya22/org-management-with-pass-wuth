@@ -8,11 +8,12 @@ import React, { useState } from "react";
 import { useRole } from "@/hooks/use-role";
 import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Loader2, Copy } from "lucide-react";
 import { Id } from "@/convex/_generated/dataModel";
+import { Input } from "@/components/ui/input";
+import { Toaster, toast } from "@/components/ui/sonner";
 
 interface UserDetailPageProps {
   params: Promise<{
@@ -24,7 +25,8 @@ export default function UserDetailPage({ params }: UserDetailPageProps) {
   const { isLoading, isResellerAdmin, isOwner, session } = useRole();
 
   const [isUpdating, setIsUpdating] = useState(false);
-  const [msg, setMsg] = useState<string | null>(null);
+  const [editingName, setEditingName] = useState(false);
+  const [nameValue, setNameValue] = useState("");
   const [resolvedParams, setResolvedParams] = useState<{
     userId: string;
   } | null>(null);
@@ -35,10 +37,18 @@ export default function UserDetailPage({ params }: UserDetailPageProps) {
   }, [params]);
 
   const updateMemberStatus = useMutation(api.teams.updateMemberStatus);
+  const updateUserName = useMutation(api.users.updateUserName);
   const userDetails = useQuery(
     api.teams.getUserDetails,
     resolvedParams ? { userId: resolvedParams.userId as Id<"users"> } : "skip",
   );
+
+  // Sync editable name value when details load/change
+  React.useEffect(() => {
+    if (userDetails) {
+      setNameValue(userDetails.name || "");
+    }
+  }, [userDetails]);
 
   const handleStatusChange = async (
     field: "isActive" | "isBlocked",
@@ -52,9 +62,9 @@ export default function UserDetailPage({ params }: UserDetailPageProps) {
         memberId: userDetails.resellerMember._id,
         [field]: value,
       });
-      setMsg("Status updated successfully");
+      toast.success("Status updated successfully");
     } catch (err: any) {
-      setMsg(err?.message ?? "Failed to update status");
+      toast.error(err?.message ?? "Failed to update status");
     } finally {
       setIsUpdating(false);
     }
@@ -118,6 +128,7 @@ export default function UserDetailPage({ params }: UserDetailPageProps) {
   return (
     <DashboardLayout>
       <div className="space-y-8 px-4 md:px-6 lg:px-8">
+        <Toaster />
         {/* Primary details - full width, less carded */}
         <section className="rounded-lg bg-muted/20 p-5">
           <h3 className="text-lg font-semibold text-muted-foreground mb-4">
@@ -138,9 +149,9 @@ export default function UserDetailPage({ params }: UserDetailPageProps) {
                   onClick={async () => {
                     try {
                       await navigator.clipboard.writeText(userDetails.email);
-                      setMsg("Email copied to clipboard");
+                      toast.success("Email copied to clipboard");
                     } catch {
-                      setMsg("Failed to copy email");
+                      toast.error("Failed to copy email");
                     }
                   }}
                   aria-label="Copy email"
@@ -152,8 +163,68 @@ export default function UserDetailPage({ params }: UserDetailPageProps) {
             <dl className="space-y-3">
               <div className="flex items-center justify-between">
                 <dt className="text-base text-muted-foreground">Name</dt>
-                <dd className="text-lg font-semibold">
-                  {userDetails.name || "No name set"}
+                <dd className="text-lg font-semibold flex items-center gap-3">
+                  {session?.user?._id === resolvedParams.userId &&
+                  editingName ? (
+                    <>
+                      <Input
+                        value={nameValue}
+                        onChange={(e) => setNameValue(e.target.value)}
+                        placeholder="Enter your name"
+                        className="w-56"
+                      />
+                      <Button
+                        size="sm"
+                        onClick={async () => {
+                          const trimmed = nameValue.trim();
+                          if (!trimmed) {
+                            toast.error("Name cannot be empty");
+                            return;
+                          }
+                          setIsUpdating(true);
+                          try {
+                            await updateUserName({ name: trimmed });
+                            toast.success("Name updated");
+                            setEditingName(false);
+                          } catch (err: any) {
+                            toast.error(
+                              err?.message ?? "Failed to update name",
+                            );
+                          } finally {
+                            setIsUpdating(false);
+                          }
+                        }}
+                        disabled={isUpdating}
+                      >
+                        Save
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => {
+                          setEditingName(false);
+                          setNameValue(userDetails.name || "");
+                        }}
+                        disabled={isUpdating}
+                      >
+                        Cancel
+                      </Button>
+                    </>
+                  ) : (
+                    <>
+                      <span>{userDetails.name || "No name set"}</span>
+                      {session?.user?._id === resolvedParams.userId && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => setEditingName(true)}
+                          aria-label="Edit name"
+                        >
+                          Edit
+                        </Button>
+                      )}
+                    </>
+                  )}
                 </dd>
               </div>
               <Separator className="my-1" />
@@ -188,111 +259,107 @@ export default function UserDetailPage({ params }: UserDetailPageProps) {
           </div>
         </section>
 
-        {/* Team & controls */}
-        <section className="rounded-lg bg-muted/20 p-5">
-          <h3 className="text-lg font-semibold text-muted-foreground mb-4">
-            Team & Access
-          </h3>
-          {userDetails.resellerMember ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <span className="text-base text-muted-foreground">
-                    Team role
-                  </span>
-                  <Badge
-                    variant={
-                      userDetails.resellerMember.role === "admin"
-                        ? "default"
-                        : "secondary"
-                    }
-                  >
-                    {userDetails.resellerMember.role}
-                  </Badge>
-                </div>
-                <Separator />
-                <div className="flex items-center justify-between">
-                  <span className="text-base text-muted-foreground">
-                    Status
-                  </span>
-                  <Badge
-                    variant={
-                      userDetails.resellerMember.isActive &&
-                      !userDetails.resellerMember.isBlocked
-                        ? "default"
-                        : userDetails.resellerMember.isBlocked
-                          ? "destructive"
+        {/* Team & controls (hidden when viewing own profile) */}
+        {!(session?.user?._id === resolvedParams.userId) && (
+          <section className="rounded-lg bg-muted/20 p-5">
+            <h3 className="text-lg font-semibold text-muted-foreground mb-4">
+              Team & Access
+            </h3>
+            {userDetails.resellerMember ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <span className="text-base text-muted-foreground">
+                      Team role
+                    </span>
+                    <Badge
+                      variant={
+                        userDetails.resellerMember.role === "admin"
+                          ? "default"
                           : "secondary"
-                    }
-                  >
-                    {userDetails.resellerMember.isBlocked
-                      ? "blocked"
-                      : userDetails.resellerMember.isActive
-                        ? "active"
-                        : "inactive"}
-                  </Badge>
-                </div>
-              </div>
-
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <span className="text-base text-muted-foreground">
-                    Active
-                  </span>
-                  <div className="flex items-center gap-2">
-                    <Switch
-                      checked={userDetails.resellerMember.isActive}
-                      onCheckedChange={(checked) =>
-                        handleStatusChange("isActive", checked)
                       }
-                      disabled={
-                        isUpdating ||
-                        userDetails.resellerMember.role === "admin"
-                      }
-                    />
-                    <span className="text-base text-muted-foreground">
-                      {userDetails.resellerMember.isActive
-                        ? "Active"
-                        : "Inactive"}
-                    </span>
+                    >
+                      {userDetails.resellerMember.role}
+                    </Badge>
                   </div>
-                </div>
-                <Separator />
-                <div className="flex items-center justify-between">
-                  <span className="text-base text-muted-foreground">
-                    Blocked
-                  </span>
-                  <div className="flex items-center gap-2">
-                    <Switch
-                      checked={userDetails.resellerMember.isBlocked}
-                      onCheckedChange={(checked) =>
-                        handleStatusChange("isBlocked", checked)
-                      }
-                      disabled={
-                        isUpdating ||
-                        userDetails.resellerMember.role === "admin"
-                      }
-                    />
+                  <Separator />
+                  <div className="flex items-center justify-between">
                     <span className="text-base text-muted-foreground">
+                      Status
+                    </span>
+                    <Badge
+                      variant={
+                        userDetails.resellerMember.isActive &&
+                        !userDetails.resellerMember.isBlocked
+                          ? "default"
+                          : userDetails.resellerMember.isBlocked
+                            ? "destructive"
+                            : "secondary"
+                      }
+                    >
                       {userDetails.resellerMember.isBlocked
-                        ? "Blocked"
-                        : "Not Blocked"}
+                        ? "blocked"
+                        : userDetails.resellerMember.isActive
+                          ? "active"
+                          : "inactive"}
+                    </Badge>
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <span className="text-base text-muted-foreground">
+                      Active
                     </span>
+                    <div className="flex items-center gap-2">
+                      <Switch
+                        checked={userDetails.resellerMember.isActive}
+                        onCheckedChange={(checked) =>
+                          handleStatusChange("isActive", checked)
+                        }
+                        disabled={
+                          isUpdating ||
+                          userDetails.resellerMember.role === "admin"
+                        }
+                      />
+                      <span className="text-base text-muted-foreground">
+                        {userDetails.resellerMember.isActive
+                          ? "Active"
+                          : "Inactive"}
+                      </span>
+                    </div>
+                  </div>
+                  <Separator />
+                  <div className="flex items-center justify-between">
+                    <span className="text-base text-muted-foreground">
+                      Blocked
+                    </span>
+                    <div className="flex items-center gap-2">
+                      <Switch
+                        checked={userDetails.resellerMember.isBlocked}
+                        onCheckedChange={(checked) =>
+                          handleStatusChange("isBlocked", checked)
+                        }
+                        disabled={
+                          isUpdating ||
+                          userDetails.resellerMember.role === "admin"
+                        }
+                      />
+                      <span className="text-base text-muted-foreground">
+                        {userDetails.resellerMember.isBlocked
+                          ? "Blocked"
+                          : "Not Blocked"}
+                      </span>
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
-          ) : (
-            <div className="py-2 text-base text-muted-foreground">
-              User is not a member of any team
-            </div>
-          )}
-        </section>
-
-        {msg && (
-          <Alert>
-            <AlertDescription>{msg}</AlertDescription>
-          </Alert>
+            ) : (
+              <div className="py-2 text-base text-muted-foreground">
+                User is not a member of any team
+              </div>
+            )}
+          </section>
         )}
       </div>
     </DashboardLayout>

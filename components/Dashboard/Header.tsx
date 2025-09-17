@@ -1,14 +1,6 @@
 "use client";
 
-import {
-  Bell,
-  ChevronDown,
-  Crown,
-  Briefcase,
-  Shield,
-  Users,
-  User,
-} from "lucide-react";
+import { ChevronDown, Crown, Shield, Users, User } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -42,7 +34,8 @@ export function Header({ className }: HeaderProps = {}) {
       return { label: "Reseller Admin", icon: Users };
     if (roleState.isResellerMember)
       return { label: "Reseller Member", icon: User };
-    if (roleState.isResellerDefaultMember) return { label: "Reseller User", icon: Users };
+    if (roleState.isResellerDefaultMember)
+      return { label: "Reseller User", icon: Users };
 
     // Fallbacks
     return { label: "User", icon: User };

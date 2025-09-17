@@ -6,8 +6,6 @@ import { api } from "@/convex/_generated/api";
 import { useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useRole } from "@/hooks/use-role";
 import { notFound } from "next/navigation";
@@ -23,8 +21,7 @@ import { Textarea } from "@/components/ui/textarea";
 import DashboardLayout from "@/components/Dashboard/DashboardLayout";
 import OwnerPermissions from "./OwnerPermissions";
 import ResellerAdminPermissions from "./ResellerAdminPermissions";
-import ResellerMemberPermissions from "./ResellerMemberPermissions";
-import StaffPermissions from "./StaffPermissions";
+import OrderChat from "@/components/OrderChat";
 
 export default function OrderDetailsPage() {
   const {
@@ -85,6 +82,13 @@ export default function OrderDetailsPage() {
   if (!allowed) return notFound();
   if (order === null)
     return <div className="p-4">Order not found or not authorized</div>;
+
+  const canWriteToChat = !!(
+    isOwner ||
+    isReseller ||
+    isStaff ||
+    isResellerAdmin
+  );
 
   return (
     <DashboardLayout>
@@ -279,40 +283,17 @@ export default function OrderDetailsPage() {
               {isResellerAdmin && orderId && (
                 <ResellerAdminPermissions orderId={orderId} order={order} />
               )}
-              {isResellerMember && orderId && (
-                <ResellerMemberPermissions orderId={orderId} order={order} />
-              )}
-              {isStaff && orderId && (
-                <StaffPermissions orderId={orderId} order={order} />
-              )}
             </CardContent>
           </Card>
-          {/* Chat (UI only, disabled) */}
+          {/* Chat */}
           <div className="order-2 lg:col-span-2">
-            <Card className="h-full flex flex-col">
-              <CardHeader>
-                <CardTitle>Chat</CardTitle>
-              </CardHeader>
-              <CardContent className="flex-1 flex flex-col gap-3">
-                <ScrollArea className="flex-1 h-[55vh] rounded border p-2 bg-card">
-                  <div className="space-y-2 text-sm">
-                    <div>
-                      <span className="font-medium">You:</span> Hello, please
-                      confirm details.
-                    </div>
-                    <div>
-                      <span className="font-medium">Staff:</span> Working on it.
-                    </div>
-                  </div>
-                </ScrollArea>
-                <form className="flex gap-2">
-                  <Input placeholder="Type a message…" disabled />
-                  <Button type="button" disabled>
-                    Send
-                  </Button>
-                </form>
-              </CardContent>
-            </Card>
+            {orderId && (
+              <OrderChat
+                orderId={orderId}
+                canWrite={canWriteToChat}
+                canReadOnly={!canWriteToChat}
+              />
+            )}
           </div>
         </div>
       </div>

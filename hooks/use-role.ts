@@ -17,8 +17,8 @@ export function useRole() {
   const isResellerDefaultMember = memberStatus === "default_member";
 
   // Only one of these should be true for reseller-side:
-  const isResellerAdmin = memberRole === "admin";
-  const isResellerMember = memberRole === "member";
+  const isResellerAdmin = memberStatus === "team_joined" && memberRole === "admin";
+  const isResellerMember = memberStatus === "team_joined" && memberRole === "member";
   // Treat ANY reseller (including default_member) as reseller for top-level routing/UI
   const isReseller = role === "reseller";
 

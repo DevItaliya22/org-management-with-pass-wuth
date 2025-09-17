@@ -77,9 +77,7 @@ export default function ResellerMemberPermissions({
           </div>
         )}
 
-        <div className="text-xs text-muted-foreground">
-          Only team admins can modify these permissions.
-        </div>
+        {/* Intentionally no footer for reseller members */}
       </section>
     </>
   );

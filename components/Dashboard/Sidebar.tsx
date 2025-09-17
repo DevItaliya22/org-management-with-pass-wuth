@@ -12,7 +12,7 @@ interface SidebarProps {
 
 export function Sidebar({ className }: SidebarProps) {
   const pathname = usePathname();
-  const { isLoading, isOwner, isStaff, isResellerAdmin, isResellerMember } =
+  const { isLoading, isOwner, isStaff, isResellerAdmin, isResellerMember ,isResellerDefaultMember} =
     useRole();
 
   const items: Array<{ name: string; href: string; icon: any }> = [
@@ -55,12 +55,12 @@ export function Sidebar({ className }: SidebarProps) {
       name: "Queue",
       href: "/staff/queue",
       icon: Users,
-     })
-     items.push({
+    });
+    items.push({
       name: "My Orders",
-      href: "/staff/myorders",
+      href: "/orders",
       icon: Users,
-     })
+    });
   } else {
     if (!isLoading && isResellerAdmin) {
       items.push({ name: "Edit Team Name", href: "/team/edit", icon: Users });
@@ -96,13 +96,8 @@ export function Sidebar({ className }: SidebarProps) {
         href: "/orders/new",
         icon: Plus,
       });
-    } else {
-      // Default member
-      items.push({
-        name: "Promotion",
-        href: "/promotion/request",
-        icon: ShieldCheck,
-      });
+    } else if (!isLoading && isResellerDefaultMember) {
+ 
       items.push({
         name: "Team Requests",
         href: "/team/requests",
@@ -117,6 +112,11 @@ export function Sidebar({ className }: SidebarProps) {
         name: "Create Order",
         href: "/orders/new",
         icon: Plus,
+      });
+       items.push({
+        name: "Promotion",
+        href: "/promotion/request",
+        icon: ShieldCheck,
       });
     }
   }

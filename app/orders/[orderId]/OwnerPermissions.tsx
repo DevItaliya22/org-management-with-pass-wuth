@@ -27,22 +27,22 @@ export default function OwnerPermissions({
   const [selectedWriteUsers, setSelectedWriteUsers] = useState<string[]>([]);
   const [savingPermissions, setSavingPermissions] = useState(false);
 
-  // Get team members for permission management (owner can see all team members)
-  const teamMembers = useQuery(api.orders.getTeamMembersForPermissions, {
+  // Owner-side: only staff and owners (non-reseller users)
+  const members = useQuery(api.orders.getOwnerSideMembersForPermissions, {
     orderId: orderId as any,
   });
 
-  // Initialize selected users when team members data loads
+  // Initialize selected users when members data loads
   useEffect(() => {
-    if (teamMembers) {
+    if (members) {
       setSelectedReadUsers(
-        teamMembers.filter((m: any) => m.hasReadAccess).map((m: any) => m._id),
+        members.filter((m: any) => m.hasReadAccess).map((m: any) => m._id),
       );
       setSelectedWriteUsers(
-        teamMembers.filter((m: any) => m.hasWriteAccess).map((m: any) => m._id),
+        members.filter((m: any) => m.hasWriteAccess).map((m: any) => m._id),
       );
     }
-  }, [teamMembers]);
+  }, [members]);
 
   const handleSavePermissions = async () => {
     try {
@@ -65,7 +65,7 @@ export default function OwnerPermissions({
     }
   };
 
-  if (!teamMembers) return null;
+  if (!members) return null;
 
   return (
     <>
@@ -79,7 +79,7 @@ export default function OwnerPermissions({
         <div className="space-y-2">
           <label className="text-sm font-medium">Read Access</label>
           <div className="space-y-2">
-            {teamMembers.map((member: any) => (
+            {members.map((member: any) => (
               <div
                 key={`read-${member._id}`}
                 className="flex items-center space-x-2"
@@ -103,7 +103,7 @@ export default function OwnerPermissions({
                 >
                   {member.name || member.email}
                   <Badge
-                    variant={member.role === "admin" ? "default" : "secondary"}
+                    variant={member.role === "owner" ? "default" : "secondary"}
                   >
                     {member.role}
                   </Badge>
@@ -123,7 +123,7 @@ export default function OwnerPermissions({
         <div className="space-y-2">
           <label className="text-sm font-medium">Write Access</label>
           <div className="space-y-2">
-            {teamMembers.map((member: any) => (
+            {members.map((member: any) => (
               <div
                 key={`write-${member._id}`}
                 className="flex items-center space-x-2"
@@ -147,7 +147,7 @@ export default function OwnerPermissions({
                 >
                   {member.name || member.email}
                   <Badge
-                    variant={member.role === "admin" ? "default" : "secondary"}
+                    variant={member.role === "owner" ? "default" : "secondary"}
                   >
                     {member.role}
                   </Badge>

@@ -35,14 +35,27 @@ export default function ResellerAdminPermissions({
   // Initialize selected users when team members data loads
   useEffect(() => {
     if (teamMembers) {
-      setSelectedReadUsers(
-        teamMembers.filter((m: any) => m.hasReadAccess).map((m: any) => m._id),
-      );
-      setSelectedWriteUsers(
-        teamMembers.filter((m: any) => m.hasWriteAccess).map((m: any) => m._id),
-      );
+      const creatorId = order?.createdByUserId as string | undefined;
+
+      const defaultReadIds = teamMembers
+        .filter(
+          (m: any) =>
+            m.hasReadAccess || m.role === "admin" || m._id === creatorId,
+        )
+        .map((m: any) => m._id);
+
+      const defaultWriteIds = teamMembers
+        .filter(
+          (m: any) =>
+            m.hasWriteAccess || m.role === "admin" || m._id === creatorId,
+        )
+        .map((m: any) => m._id);
+
+      // Deduplicate
+      setSelectedReadUsers(Array.from(new Set(defaultReadIds)));
+      setSelectedWriteUsers(Array.from(new Set(defaultWriteIds)));
     }
-  }, [teamMembers]);
+  }, [teamMembers, order]);
 
   const handleSavePermissions = async () => {
     try {
