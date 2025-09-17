@@ -585,6 +585,8 @@ export const getTeamMembers = query({
       ),
       isActive: v.boolean(),
       isBlocked: v.boolean(),
+      approvedByUserId: v.optional(v.id("users")),
+      approvedAt: v.optional(v.number()),
       createdAt: v.number(),
       updatedAt: v.number(),
       user: v.object({
