@@ -21,7 +21,7 @@ export default function SignIn() {
         style={{
           height: "35vh",
           background:
-            "linear-gradient(to left, oklch(0.7 0.25 180), oklch(0.7 0.25 200), oklch(0.6 0.2 270), oklch(0.7 0.3 320))",
+            "linear-gradient(to left, oklch(0.7 0.3 320), oklch(0.6 0.2 270), oklch(0.7 0.25 200), oklch(0.7 0.25 180))",
           maskImage:
             "linear-gradient(to bottom, rgba(0,0,0,1) 0%, rgba(0,0,0,0) 70%)",
           WebkitMaskImage:
@@ -254,7 +254,7 @@ export default function SignIn() {
         style={{
           height: "35vh",
           background:
-            "linear-gradient(to left, oklch(0.7 0.25 180), oklch(0.7 0.25 200), oklch(0.6 0.2 270), oklch(0.7 0.3 320))",
+            "linear-gradient(to left, oklch(0.7 0.3 320), oklch(0.6 0.2 270), oklch(0.7 0.25 200), oklch(0.7 0.25 180))",
           maskImage:
             "linear-gradient(to bottom, rgba(0,0,0,1) 0%, rgba(0,0,0,0) 70%)",
           WebkitMaskImage:

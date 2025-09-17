@@ -556,6 +556,38 @@ export const passOrder = mutation({
       orderId: args.orderId,
       createdAt: now,
     });
+
+    // Auto-cancel if all active staff have passed on this order
+    // Define active staff as records in `staff` with isActive===true (any status)
+    const activeStaff = await ctx.db.query("staff").collect();
+    const activeStaffUserIds = activeStaff
+      .filter((s: any) => s.isActive)
+      .map((s: any) => s.userId);
+
+    // If there are no active staff, do not cancel
+    if (activeStaffUserIds.length > 0) {
+      const passedUserIds = new Set(passedList.map((p: any) => String(p.userId)));
+      const allPassed = activeStaffUserIds.every(
+        (sid: any) => passedUserIds.has(String(sid)),
+      );
+      if (allPassed && order.status === "submitted") {
+        const cancelAt = Date.now();
+        await ctx.db.patch(args.orderId, {
+          status: "cancelled",
+          updatedAt: cancelAt,
+        });
+        await ctx.db.insert("auditLogs", {
+          actorUserId: userId,
+          entity: "order",
+          entityId: String(args.orderId),
+          action: "order_cancelled_auto_all_passed",
+          metadata: { totalActiveStaff: activeStaffUserIds.length },
+          orderId: args.orderId,
+          createdAt: cancelAt,
+        });
+      }
+    }
+
     return null;
   },
 });
