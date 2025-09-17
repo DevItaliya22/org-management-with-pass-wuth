@@ -319,9 +319,9 @@ export default defineSchema({
     .index("by_date", ["dateKey"]),
 
   files: defineTable({
-    s3Key: v.string(), // S3 object key
+    storageId: v.id("_storage"), // Convex storage file id
     uiName: v.string(), // Original filename
-    sizeBytes: v.number(), // File size in bytes
+    sizeBytes: v.number(), // File size in bytes (duplicated for convenience)
     uploadedByUserId: v.id("users"), // Who uploaded the file
     entityType: v.union(
       v.literal("order"),
@@ -335,6 +335,6 @@ export default defineSchema({
   })
     .index("by_uploader", ["uploadedByUserId"])
     .index("by_entity", ["entityType", "entityId"])
-    .index("by_s3_key", ["s3Key"])
+    .index("by_storageId", ["storageId"])
     .index("by_createdAt", ["createdAt"]),
 });

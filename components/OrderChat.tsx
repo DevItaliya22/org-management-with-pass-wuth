@@ -24,6 +24,10 @@ export default function OrderChat({
   const [message, setMessage] = useState("");
   const [files, setFiles] = useState<Array<File>>([]);
   const [chatId, setChatId] = useState<Id<"chats"> | null>(null);
+  const [isSending, setIsSending] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<Record<string, number>>(
+    {},
+  );
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const listEndRef = useRef<HTMLDivElement | null>(null);
   type OptimisticMessage = {
@@ -56,6 +60,30 @@ export default function OrderChat({
 
   // Send message mutation
   const sendMessageMutation = useMutation(api.chat.sendMessage);
+
+  // File upload mutations
+  const generateUploadUrl = useMutation(api.chat.generateUploadUrl);
+  const saveUploadedFile = useMutation(api.chat.saveUploadedFile);
+
+  // File attachment component
+  const FileAttachment = ({ fileId }: { fileId: Id<"files"> }) => {
+    const fileUrl = useQuery(api.chat.getFileUrl, { fileId });
+
+    if (!fileUrl) {
+      return <span className="text-xs opacity-60">Loading...</span>;
+    }
+
+    return (
+      <a
+        href={fileUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="text-xs underline hover:no-underline"
+      >
+        📎 Download
+      </a>
+    );
+  };
 
   // Merge server and optimistic messages for display (server messages first, then optimistic)
   const displayMessages = ((chatData?.messages as any[]) || []).concat(
@@ -146,8 +174,15 @@ export default function OrderChat({
                         )}
                         {msg.attachmentFileIds &&
                           msg.attachmentFileIds.length > 0 && (
-                            <div className="text-xs opacity-80 mt-1">
-                              📎 {msg.attachmentFileIds.length} attachment(s)
+                            <div className="flex flex-wrap gap-2 mt-2">
+                              {msg.attachmentFileIds.map(
+                                (fileId: Id<"files">) => (
+                                  <FileAttachment
+                                    key={fileId}
+                                    fileId={fileId}
+                                  />
+                                ),
+                              )}
                             </div>
                           )}
                       </div>
@@ -162,35 +197,56 @@ export default function OrderChat({
         {/* File chips area (like ChatGPT) */}
         {files.length > 0 && (
           <div className="flex flex-wrap gap-2 p-2 rounded border bg-muted/40">
-            {files.map((file, idx) => (
-              <Badge
-                key={`${file.name}-${file.size}-${idx}`}
-                variant="secondary"
-                className="flex items-center gap-2"
-              >
-                <span className="truncate max-w-[180px]" title={file.name}>
-                  {file.name}
-                </span>
-                <button
-                  type="button"
-                  className="ml-1 text-muted-foreground hover:text-foreground"
-                  aria-label={`Remove ${file.name}`}
-                  onClick={() => {
-                    setFiles((prev) => prev.filter((_, i) => i !== idx));
-                  }}
+            {files.map((file, idx) => {
+              const fileKey = `${file.name}-${file.size}-${idx}`;
+              const progress = uploadProgress[fileKey] || 0;
+              const isUploading = isSending && progress < 100;
+
+              return (
+                <Badge
+                  key={fileKey}
+                  variant={isUploading ? "outline" : "secondary"}
+                  className="flex items-center gap-2"
                 >
-                  ×
-                </button>
-              </Badge>
-            ))}
+                  <span className="truncate max-w-[180px]" title={file.name}>
+                    {file.name}
+                  </span>
+                  {isUploading && (
+                    <span className="text-xs text-muted-foreground">
+                      {progress}%
+                    </span>
+                  )}
+                  {!isSending && (
+                    <button
+                      type="button"
+                      className="ml-1 text-muted-foreground hover:text-foreground"
+                      aria-label={`Remove ${file.name}`}
+                      onClick={() => {
+                        setFiles((prev) => prev.filter((_, i) => i !== idx));
+                      }}
+                    >
+                      ×
+                    </button>
+                  )}
+                </Badge>
+              );
+            })}
           </div>
         )}
         <form
           className="flex flex-col gap-2"
           onSubmit={async (e) => {
             e.preventDefault();
-            if (disabled || (!message.trim() && files.length === 0) || !chatId)
+            if (
+              disabled ||
+              (!message.trim() && files.length === 0) ||
+              !chatId ||
+              isSending
+            )
               return;
+
+            setIsSending(true);
+            setUploadProgress({});
 
             try {
               const optimisticId = `temp-${Date.now()}-${Math.random().toString(36).slice(2)}`;
@@ -207,17 +263,66 @@ export default function OrderChat({
                 optimistic: true,
               };
               setOptimisticMessages((prev) => [...prev, optimistic]);
-              setMessage("");
-              setFiles([]);
 
-              // For now, we'll just send text messages
-              // File upload functionality can be added later
+              // Upload files if any
+              let attachmentFileIds: Id<"files">[] = [];
+              if (files.length > 0) {
+                attachmentFileIds = await Promise.all(
+                  files.map(async (file, index) => {
+                    const fileKey = `${file.name}-${file.size}-${index}`;
+
+                    try {
+                      // Step 1: Generate upload URL
+                      setUploadProgress((prev) => ({ ...prev, [fileKey]: 10 }));
+                      const postUrl = await generateUploadUrl();
+
+                      // Step 2: Upload file to Convex storage
+                      setUploadProgress((prev) => ({ ...prev, [fileKey]: 50 }));
+                      const result = await fetch(postUrl, {
+                        method: "POST",
+                        headers: { "Content-Type": file.type },
+                        body: file,
+                      });
+                      const { storageId } = await result.json();
+
+                      // Step 3: Save file metadata to database
+                      setUploadProgress((prev) => ({ ...prev, [fileKey]: 80 }));
+                      const fileId = await saveUploadedFile({
+                        storageId,
+                        uiName: file.name,
+                        sizeBytes: file.size,
+                        entityType: "message",
+                        entityId: undefined, // Will be set after message is created
+                      });
+
+                      setUploadProgress((prev) => ({
+                        ...prev,
+                        [fileKey]: 100,
+                      }));
+                      return fileId;
+                    } catch (error) {
+                      console.error(
+                        `Failed to upload file ${file.name}:`,
+                        error,
+                      );
+                      throw error;
+                    }
+                  }),
+                );
+              }
+
+              // Send message with attachments
               await sendMessageMutation({
                 orderId: orderId as Id<"orders">,
                 chatId,
                 content: optimistic.content,
-                // attachmentFileIds: files.length > 0 ? [] : undefined, // TODO: implement file upload
+                attachmentFileIds:
+                  attachmentFileIds.length > 0 ? attachmentFileIds : undefined,
               });
+
+              setMessage("");
+              setFiles([]);
+              setUploadProgress({});
 
               // Do not remove on success immediately; reconciliation effect will handle it
             } catch (error) {
@@ -227,6 +332,8 @@ export default function OrderChat({
               setOptimisticMessages((prev) =>
                 prev.filter((m) => !m.optimistic),
               );
+            } finally {
+              setIsSending(false);
             }
           }}
         >
@@ -259,7 +366,7 @@ export default function OrderChat({
               type="button"
               variant="outline"
               onClick={() => fileInputRef.current?.click()}
-              disabled={disabled}
+              disabled={disabled || isSending}
             >
               Attach files
             </Button>
@@ -267,15 +374,18 @@ export default function OrderChat({
               placeholder={canReadOnly ? "Read-only" : "Type a message…"}
               value={message}
               onChange={(e) => setMessage(e.target.value)}
-              disabled={disabled}
+              disabled={disabled || isSending}
             />
             <Button
               type="submit"
               disabled={
-                disabled || (!message.trim() && files.length === 0) || !chatId
+                disabled ||
+                (!message.trim() && files.length === 0) ||
+                !chatId ||
+                isSending
               }
             >
-              Send
+              {isSending ? "Sending..." : "Send"}
             </Button>
           </div>
         </form>
