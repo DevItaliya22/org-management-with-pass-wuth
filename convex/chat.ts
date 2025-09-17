@@ -1,0 +1,218 @@
+import { query, mutation } from "./_generated/server";
+import { v } from "convex/values";
+import { getAuthUserId } from "@convex-dev/auth/server";
+import { Doc, Id } from "./_generated/dataModel";
+
+// Helper to ensure viewer and load minimal user
+async function requireViewer(ctx: any) {
+  const userId = await getAuthUserId(ctx);
+  if (!userId) throw new Error("Not authenticated");
+  const user = await ctx.db.get(userId);
+  if (!user) throw new Error("User not found");
+  return { userId, user } as { userId: Id<"users">; user: Doc<"users"> };
+}
+
+// Helper to check if user has write access to order chat
+async function checkWriteAccess(
+  ctx: any,
+  userId: Id<"users">,
+  orderId: Id<"orders">,
+) {
+  const order = await ctx.db.get(orderId);
+  if (!order) throw new Error("Order not found");
+
+  const user = await ctx.db.get(userId);
+  if (!user) throw new Error("User not found");
+
+  // Owner always has access
+  if (user.role === "owner") return true;
+
+  // Staff who picked the order has access
+  if (user.role === "staff" && order.pickedByStaffUserId === userId)
+    return true;
+
+  // Reseller member who created the order has access
+  if (order.createdByUserId === userId) return true;
+
+  // Reseller member or admin from the team the order belongs to has access
+  if (user.role !== "staff" && user.role !== "owner") {
+    const membership = await ctx.db
+      .query("resellerMembers")
+      .withIndex("by_user", (q: any) => q.eq("userId", userId))
+      .filter((q: any) => q.eq(q.field("teamId"), order.teamId))
+      .first();
+
+    if (membership && membership.isActive && !membership.isBlocked) {
+      // Both admin and regular members have access if they're active
+      return true;
+    }
+  }
+
+  return false;
+}
+
+// Helper to check if user has read access to order chat
+async function checkReadAccess(
+  ctx: any,
+  userId: Id<"users">,
+  orderId: Id<"orders">,
+) {
+  const order = await ctx.db.get(orderId);
+  if (!order) throw new Error("Order not found");
+
+  // Check if user is in readAccessUserIds OR has write access
+  const hasExplicitReadAccess = order.readAccessUserIds.includes(userId);
+  const hasWriteAccess = await checkWriteAccess(ctx, userId, orderId);
+
+  return hasExplicitReadAccess || hasWriteAccess;
+}
+
+export const getChatMessages = query({
+  args: { chatId: v.id("chats") },
+  returns: v.object({
+    chat: v.object({
+      _id: v.id("chats"),
+      _creationTime: v.number(),
+      orderId: v.id("orders"),
+      isOpen: v.boolean(),
+      openedAt: v.number(),
+      closedAt: v.optional(v.number()),
+    }),
+    messages: v.array(
+      v.object({
+        _id: v.id("messages"),
+        _creationTime: v.number(),
+        chatId: v.id("chats"),
+        senderUserId: v.id("users"),
+        senderName: v.optional(v.string()),
+        content: v.optional(v.string()),
+        attachmentFileIds: v.optional(v.array(v.id("files"))),
+        createdAt: v.number(),
+        viewedByUserIds: v.array(v.id("users")),
+      }),
+    ),
+  }),
+  handler: async (ctx, args) => {
+    const { userId } = await requireViewer(ctx);
+
+    const chat = await ctx.db.get(args.chatId);
+    if (!chat) throw new Error("Chat not found");
+
+    // Check if user has read access to the order
+    const hasReadAccess = await checkReadAccess(ctx, userId, chat.orderId);
+    if (!hasReadAccess) {
+      throw new Error("Not authorized to read this chat");
+    }
+
+    // Get messages for this chat
+    const messages = await ctx.db
+      .query("messages")
+      .withIndex("by_chat", (q) => q.eq("chatId", args.chatId))
+      .order("asc")
+      .collect();
+
+    // Enrich messages with sender names
+    const enrichedMessages = await Promise.all(
+      messages.map(async (message) => {
+        const sender = await ctx.db.get(message.senderUserId);
+        return {
+          ...message,
+          senderName: sender?.name || sender?.email || "Unknown User",
+        };
+      }),
+    );
+
+    return {
+      chat,
+      messages: enrichedMessages,
+    };
+  },
+});
+
+export const sendMessage = mutation({
+  args: {
+    orderId: v.id("orders"),
+    chatId: v.id("chats"),
+    content: v.optional(v.string()),
+    attachmentFileIds: v.optional(v.array(v.id("files"))),
+  },
+  returns: v.object({ messageId: v.id("messages") }),
+  handler: async (ctx, args) => {
+    const { userId } = await requireViewer(ctx);
+
+    // Verify the order exists and user has write access
+    const hasWriteAccess = await checkWriteAccess(ctx, userId, args.orderId);
+    if (!hasWriteAccess) {
+      throw new Error("Not authorized to write to this chat");
+    }
+
+    // Verify the chat exists and belongs to the order
+    const chat = await ctx.db.get(args.chatId);
+    if (!chat) throw new Error("Chat not found");
+    if (chat.orderId !== args.orderId) {
+      throw new Error("Chat does not belong to this order");
+    }
+
+    // Ensure chat is open
+    if (!chat.isOpen) {
+      throw new Error("Chat is closed");
+    }
+
+    // Validate that we have either content or attachments
+    if (
+      !args.content &&
+      (!args.attachmentFileIds || args.attachmentFileIds.length === 0)
+    ) {
+      throw new Error("Message must have either content or attachments");
+    }
+
+    const now = Date.now();
+
+    // Create the message
+    const messageId = await ctx.db.insert("messages", {
+      chatId: args.chatId,
+      senderUserId: userId,
+      content: args.content,
+      attachmentFileIds: args.attachmentFileIds,
+      createdAt: now,
+      viewedByUserIds: [userId], // Sender has viewed the message
+    });
+
+    return { messageId };
+  },
+});
+
+// Helper mutation to get or create a chat for an order
+export const getOrCreateChat = mutation({
+  args: { orderId: v.id("orders") },
+  returns: v.object({ chatId: v.id("chats") }),
+  handler: async (ctx, args) => {
+    const { userId } = await requireViewer(ctx);
+
+    // Check if user has read access to the order
+    const hasReadAccess = await checkReadAccess(ctx, userId, args.orderId);
+    if (!hasReadAccess) {
+      throw new Error("Not authorized to access this order");
+    }
+
+    // Check if chat already exists for this order
+    const existingChat = await ctx.db
+      .query("chats")
+      .withIndex("by_order", (q) => q.eq("orderId", args.orderId))
+      .first();
+
+    if (existingChat) {
+      return { chatId: existingChat._id };
+    }
+
+    // Create new chat
+    const now = Date.now();
+    const chatId = await ctx.db.insert("chats", {
+      orderId: args.orderId,
+      isOpen: true,
+      openedAt: now,
+    });
+
+    return { chatId };
+  },
+});

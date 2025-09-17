@@ -5,7 +5,10 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { useRef, useState } from "react";
+import { useRef, useState, useEffect } from "react";
+import { useQuery, useMutation } from "convex/react";
+import { api } from "@/convex/_generated/api";
+import { Id } from "@/convex/_generated/dataModel";
 
 type OrderChatProps = {
   orderId: string;
@@ -20,9 +23,34 @@ export default function OrderChat({
 }: OrderChatProps) {
   const [message, setMessage] = useState("");
   const [files, setFiles] = useState<Array<File>>([]);
+  const [chatId, setChatId] = useState<Id<"chats"> | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-  // Placeholder UI only. Wire to backend when available.
+  // Get or create chat for this order
+  const getOrCreateChat = useMutation(api.chat.getOrCreateChat);
+
+  // Get chat messages
+  const chatData = useQuery(
+    api.chat.getChatMessages,
+    chatId ? { chatId } : "skip",
+  );
+
+  // Send message mutation
+  const sendMessageMutation = useMutation(api.chat.sendMessage);
+
+  // Initialize chat when component mounts
+  useEffect(() => {
+    if (orderId && !chatId) {
+      getOrCreateChat({ orderId: orderId as Id<"orders"> })
+        .then((result) => {
+          setChatId(result.chatId);
+        })
+        .catch((error) => {
+          console.error("Failed to get or create chat:", error);
+        });
+    }
+  }, [orderId, chatId, getOrCreateChat]);
+
   const disabled = !canWrite;
 
   return (
@@ -33,13 +61,31 @@ export default function OrderChat({
       <CardContent className="flex-1 flex flex-col gap-3">
         <ScrollArea className="flex-1 h-[55vh] rounded border p-2 bg-card">
           <div className="space-y-2 text-sm">
-            <div>
-              <span className="font-medium">You:</span> Hello, please confirm
-              details.
-            </div>
-            <div>
-              <span className="font-medium">Staff:</span> Working on it.
-            </div>
+            {chatData?.messages.length === 0 ? (
+              <div className="text-muted-foreground text-center py-4">
+                No messages yet. Start the conversation!
+              </div>
+            ) : (
+              chatData?.messages.map((msg) => (
+                <div key={msg._id} className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium text-xs text-muted-foreground">
+                      {msg.senderName}
+                    </span>
+                    <span className="text-xs text-muted-foreground">
+                      {new Date(msg.createdAt).toLocaleTimeString()}
+                    </span>
+                  </div>
+                  {msg.content && <div className="text-sm">{msg.content}</div>}
+                  {msg.attachmentFileIds &&
+                    msg.attachmentFileIds.length > 0 && (
+                      <div className="text-xs text-muted-foreground">
+                        📎 {msg.attachmentFileIds.length} attachment(s)
+                      </div>
+                    )}
+                </div>
+              ))
+            )}
           </div>
         </ScrollArea>
         {/* File chips area (like ChatGPT) */}
@@ -70,12 +116,27 @@ export default function OrderChat({
         )}
         <form
           className="flex flex-col gap-2"
-          onSubmit={(e) => {
+          onSubmit={async (e) => {
             e.preventDefault();
-            if (disabled || !message.trim()) return;
-            // No-op: backend not implemented yet
-            setMessage("");
-            setFiles([]);
+            if (disabled || (!message.trim() && files.length === 0) || !chatId)
+              return;
+
+            try {
+              // For now, we'll just send text messages
+              // File upload functionality can be added later
+              await sendMessageMutation({
+                orderId: orderId as Id<"orders">,
+                chatId,
+                content: message.trim() || undefined,
+                // attachmentFileIds: files.length > 0 ? [] : undefined, // TODO: implement file upload
+              });
+
+              setMessage("");
+              setFiles([]);
+            } catch (error) {
+              console.error("Failed to send message:", error);
+              // TODO: Show error toast
+            }
           }}
         >
           <div className="flex items-center gap-2">
@@ -117,7 +178,12 @@ export default function OrderChat({
               onChange={(e) => setMessage(e.target.value)}
               disabled={disabled}
             />
-            <Button type="submit" disabled={disabled || !message.trim()}>
+            <Button
+              type="submit"
+              disabled={
+                disabled || (!message.trim() && files.length === 0) || !chatId
+              }
+            >
               Send
             </Button>
           </div>

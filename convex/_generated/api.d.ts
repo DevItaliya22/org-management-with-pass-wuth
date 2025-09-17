@@ -15,6 +15,7 @@ import type {
 } from "convex/server";
 import type * as access from "../access.js";
 import type * as auth from "../auth.js";
+import type * as chat from "../chat.js";
 import type * as cron from "../cron.js";
 import type * as http from "../http.js";
 import type * as lib_teamNames from "../lib/teamNames.js";
@@ -38,6 +39,7 @@ import type * as users from "../users.js";
 declare const fullApi: ApiFromModules<{
   access: typeof access;
   auth: typeof auth;
+  chat: typeof chat;
   cron: typeof cron;
   http: typeof http;
   "lib/teamNames": typeof lib_teamNames;
