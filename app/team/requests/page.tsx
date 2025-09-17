@@ -5,7 +5,6 @@ import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { notFound } from "next/navigation";
 import { useRole } from "@/hooks/use-role";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table,
   TableBody,
@@ -16,6 +15,7 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Inbox } from "lucide-react";
 
 export default function TeamRequestsPage() {
   const { isLoading, isResellerDefaultMember, isResellerMember } = useRole();
@@ -42,83 +42,82 @@ export default function TeamRequestsPage() {
           </p>
         </div>
 
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle>Invitations</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {invites && invites.length > 0 ? (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Team</TableHead>
-                    <TableHead>Invited By</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Expires</TableHead>
-                    <TableHead className="text-right">Invited At</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {invites.map((i) => (
-                    <TableRow key={i._id}>
-                      <TableCell className="font-medium">
-                        {i.teamName}
-                      </TableCell>
-                      <TableCell className="break-all">
-                        {i.invitedByEmail}
-                      </TableCell>
-                      <TableCell>
-                        {i.status === "rejected" ? (
-                          <Badge variant="destructive">{i.status}</Badge>
-                        ) : i.status === "pending" ? (
-                          <Badge variant="outline">{i.status}</Badge>
-                        ) : (
-                          <Badge
-                            variant="outline"
+        <div className="space-y-2">
+          {invites && invites.length > 0 ? (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Team</TableHead>
+                  <TableHead>Invited By</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Expires</TableHead>
+                  <TableHead className="text-right">Invited At</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {invites.map((i) => (
+                  <TableRow key={i._id}>
+                    <TableCell className="font-medium">{i.teamName}</TableCell>
+                    <TableCell className="break-all">
+                      {i.invitedByEmail}
+                    </TableCell>
+                    <TableCell>
+                      {i.status === "rejected" ? (
+                        <Badge variant="destructive">{i.status}</Badge>
+                      ) : i.status === "pending" ? (
+                        <Badge variant="outline">{i.status}</Badge>
+                      ) : (
+                        <Badge
+                          variant="outline"
+                          className="bg-green-600 text-white hover:bg-green-600"
+                        >
+                          {i.status}
+                        </Badge>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {new Date(i.expiresAt).toLocaleString()}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      {new Date(i.invitedAt).toLocaleString()}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      {i.status === "pending" && (
+                        <div className="flex items-center justify-end gap-2">
+                          <Button
+                            size="sm"
                             className="bg-green-600 text-white hover:bg-green-600"
+                            onClick={() => accept({ invitationId: i._id })}
                           >
-                            {i.status}
-                          </Badge>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        {new Date(i.expiresAt).toLocaleString()}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {new Date(i.invitedAt).toLocaleString()}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {i.status === "pending" && (
-                          <div className="flex items-center justify-end gap-2">
-                            <Button
-                              size="sm"
-                              className="bg-green-600 text-white hover:bg-green-600"
-                              onClick={() => accept({ invitationId: i._id })}
-                            >
-                              Accept
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="destructive"
-                              onClick={() => reject({ invitationId: i._id })}
-                            >
-                              Reject
-                            </Button>
-                          </div>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            ) : (
-              <div className="text-sm text-muted-foreground">
-                No invitations.
+                            Accept
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="destructive"
+                            onClick={() => reject({ invitationId: i._id })}
+                          >
+                            Reject
+                          </Button>
+                        </div>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          ) : (
+            <div className="py-24 flex flex-col items-center justify-center text-center">
+              <Inbox className="h-12 w-12 text-muted-foreground mb-3" />
+              <div className="text-lg font-medium text-muted-foreground">
+                No invitations on this page
               </div>
-            )}
-          </CardContent>
-        </Card>
+              <div className="text-sm text-muted-foreground">
+                You’ll see your team invitations here when you have any.
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     </DashboardLayout>
   );

@@ -6,7 +6,6 @@ import { api } from "@/convex/_generated/api";
 import { notFound } from "next/navigation";
 import { useState } from "react";
 import { useRole } from "@/hooks/use-role";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -28,7 +27,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Edit, Plus, Loader2 } from "lucide-react";
+import { Edit, Plus, Loader2, Inbox } from "lucide-react";
 import { Id } from "@/convex/_generated/dataModel";
 
 export default function StaffManagementPage() {
@@ -70,13 +69,24 @@ export default function StaffManagementPage() {
   } | null>(null);
   const [editName, setEditName] = useState("");
   const [isUpdating, setIsUpdating] = useState(false);
+  const [editStatus, setEditStatus] = useState<string | null>(null);
+
+  const isValidEmail = (value: string) => /.+@.+\..+/.test(value);
+  const canCreate = isValidEmail(email.trim()) && password.trim().length > 0;
+  const canUpdate = editName.trim().length > 0;
 
   const onCreateSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setCreateStatus(null);
     setIsCreating(true);
     try {
-      await createStaff({ email, password });
+      const trimmedEmail = email.trim();
+      const trimmedPassword = password.trim();
+      if (!isValidEmail(trimmedEmail) || !trimmedPassword) {
+        setCreateStatus("Valid email and password are required");
+        return;
+      }
+      await createStaff({ email: trimmedEmail, password: trimmedPassword });
       setCreateStatus("Staff created successfully");
       setEmail("");
       setPassword("");
@@ -91,10 +101,15 @@ export default function StaffManagementPage() {
   const onEditSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingStaff) return;
-
+    setEditStatus(null);
     setIsUpdating(true);
     try {
-      await updateStaffName({ userId: editingStaff.userId, name: editName });
+      const trimmedName = editName.trim();
+      if (!trimmedName) {
+        setEditStatus("Name is required");
+        return;
+      }
+      await updateStaffName({ userId: editingStaff.userId, name: trimmedName });
       setIsEditModalOpen(false);
       setEditingStaff(null);
       setEditName("");
@@ -125,7 +140,7 @@ export default function StaffManagementPage() {
   return (
     <DashboardLayout>
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-2">
           <div>
             <h2 className="text-2xl font-semibold tracking-tight">
               Staff Management
@@ -136,10 +151,12 @@ export default function StaffManagementPage() {
           </div>
           <Dialog open={isCreateModalOpen} onOpenChange={setIsCreateModalOpen}>
             <DialogTrigger asChild>
-              <Button>
-                <Plus className="h-4 w-4 mr-2" />
-                Add Staff
-              </Button>
+              <div className="min-w-[220px]">
+                <GradientButton>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Staff
+                </GradientButton>
+              </div>
             </DialogTrigger>
             <DialogContent>
               <DialogHeader>
@@ -154,7 +171,6 @@ export default function StaffManagementPage() {
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="e.g. alex@company.com"
-                    required
                   />
                 </div>
                 <div className="space-y-2">
@@ -165,7 +181,6 @@ export default function StaffManagementPage() {
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="Enter a secure password"
-                    required
                   />
                 </div>
                 {createStatus && (
@@ -186,6 +201,7 @@ export default function StaffManagementPage() {
                     type="submit"
                     isLoading={isCreating}
                     loadingText="Creating..."
+                    disabled={isCreating || !canCreate}
                   >
                     Create Staff
                   </GradientButton>
@@ -195,73 +211,71 @@ export default function StaffManagementPage() {
           </Dialog>
         </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Staff Members</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {staffMembers === undefined ? (
-              <div className="flex items-center justify-center py-8">
-                <Loader2 className="h-6 w-6 animate-spin" />
-                <span className="ml-2">Loading staff members...</span>
-              </div>
-            ) : staffMembers.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
-                No staff members found. Create your first staff member to get
-                started.
-              </div>
-            ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Email</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Actions</TableHead>
+        <div className="space-y-2">
+          <h3 className="text-sm font-medium text-muted-foreground">
+            Staff Members
+          </h3>
+          {staffMembers === undefined ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="h-6 w-6 animate-spin" />
+              <span className="ml-2">Loading staff members...</span>
+            </div>
+          ) : staffMembers.length === 0 ? (
+            <div className="flex flex-col items-center justify-center border rounded-md py-12 text-center text-muted-foreground">
+              <Inbox className="h-8 w-8 mb-2" />
+              <div>No staff members found</div>
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Email</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {staffMembers.map((staff) => (
+                  <TableRow key={staff._id}>
+                    <TableCell className="font-medium">
+                      {staff.user.name || "No name set"}
+                    </TableCell>
+                    <TableCell>{staff.user.email}</TableCell>
+                    <TableCell>
+                      <Badge
+                        variant={
+                          staff.status === "online"
+                            ? "default"
+                            : staff.status === "paused"
+                              ? "secondary"
+                              : "destructive"
+                        }
+                      >
+                        {staff.status}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() =>
+                          openEditModal({
+                            userId: staff.user._id,
+                            name: staff.user.name,
+                            email: staff.user.email,
+                          })
+                        }
+                      >
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                    </TableCell>
                   </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {staffMembers.map((staff) => (
-                    <TableRow key={staff._id}>
-                      <TableCell className="font-medium">
-                        {staff.user.name || "No name set"}
-                      </TableCell>
-                      <TableCell>{staff.user.email}</TableCell>
-                      <TableCell>
-                        <Badge
-                          variant={
-                            staff.status === "online"
-                              ? "default"
-                              : staff.status === "paused"
-                                ? "secondary"
-                                : "outline"
-                          }
-                        >
-                          {staff.status}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() =>
-                            openEditModal({
-                              userId: staff.user._id,
-                              name: staff.user.name,
-                              email: staff.user.email,
-                            })
-                          }
-                        >
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            )}
-          </CardContent>
-        </Card>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </div>
 
         {/* Edit Staff Modal */}
         <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>

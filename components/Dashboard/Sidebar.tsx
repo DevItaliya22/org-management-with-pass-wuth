@@ -108,6 +108,16 @@ export function Sidebar({ className }: SidebarProps) {
         href: "/team/requests",
         icon: Users,
       });
+      items.push({
+        name: "Orders",
+        href: "/orders",
+        icon: Users,
+      });
+      items.push({
+        name: "Create Order",
+        href: "/orders/new",
+        icon: Plus,
+      });
     }
   }
 

@@ -5,9 +5,9 @@ import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { notFound } from "next/navigation";
 import { useRole } from "@/hooks/use-role";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Inbox } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -33,115 +33,105 @@ export default function PromotionRequestsPage() {
   return (
     <DashboardLayout>
       <div className="space-y-6">
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle>Pending Requests</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {pending.length > 0 ? (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Team</TableHead>
-                    <TableHead>Requester</TableHead>
-                    <TableHead className="text-right">Requested At</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
+        <div className="space-y-2">
+          <h2 className="text-base font-semibold">Pending Requests</h2>
+          {pending.length > 0 ? (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Team</TableHead>
+                  <TableHead>Requester</TableHead>
+                  <TableHead className="text-right">Requested At</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {pending.map((r) => (
+                  <TableRow key={r._id}>
+                    <TableCell className="font-medium">{r.teamName}</TableCell>
+                    <TableCell>{r.requesterName}</TableCell>
+                    <TableCell className="text-right">
+                      {new Date(r.requestedAt).toLocaleString()}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex items-center justify-end gap-2">
+                        <Button
+                          size="sm"
+                          className="bg-green-600 text-white hover:bg-green-600"
+                          onClick={() =>
+                            review({ requestId: r._id, approve: true })
+                          }
+                        >
+                          Approve
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="destructive"
+                          onClick={() =>
+                            review({ requestId: r._id, approve: false })
+                          }
+                        >
+                          Reject
+                        </Button>
+                      </div>
+                    </TableCell>
                   </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {pending.map((r) => (
-                    <TableRow key={r._id}>
-                      <TableCell className="font-medium">
-                        {r.teamName}
-                      </TableCell>
-                      <TableCell>{r.requesterName}</TableCell>
-                      <TableCell className="text-right">
-                        {new Date(r.requestedAt).toLocaleString()}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex items-center justify-end gap-2">
-                          <Button
-                            size="sm"
-                            className="bg-green-600 text-white hover:bg-green-600"
-                            onClick={() =>
-                              review({ requestId: r._id, approve: true })
-                            }
-                          >
-                            Approve
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="destructive"
-                            onClick={() =>
-                              review({ requestId: r._id, approve: false })
-                            }
-                          >
-                            Reject
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            ) : (
-              <div className="text-sm text-muted-foreground">
-                No pending requests.
-              </div>
-            )}
-          </CardContent>
-        </Card>
+                ))}
+              </TableBody>
+            </Table>
+          ) : (
+            <div className="flex flex-col items-center justify-center border rounded-md py-12 text-center text-muted-foreground">
+              <Inbox className="h-8 w-8 mb-2" />
+              <div>No pending requests</div>
+            </div>
+          )}
+        </div>
 
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle>History</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {history.length > 0 ? (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Team</TableHead>
-                    <TableHead>Requester</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="text-right">Requested At</TableHead>
+        <div className="space-y-2">
+          <h2 className="text-base font-semibold">History</h2>
+          {history.length > 0 ? (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Team</TableHead>
+                  <TableHead>Requester</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead className="text-right">Requested At</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {history.map((r) => (
+                  <TableRow key={r._id}>
+                    <TableCell className="font-medium">{r.teamName}</TableCell>
+                    <TableCell>{r.requesterName}</TableCell>
+                    <TableCell>
+                      {r.status === "approved" ? (
+                        <Badge
+                          variant="outline"
+                          className="bg-green-600 text-white hover:bg-green-600"
+                        >
+                          {r.status}
+                        </Badge>
+                      ) : r.status === "rejected" ? (
+                        <Badge variant="destructive">{r.status}</Badge>
+                      ) : (
+                        <Badge variant="outline">{r.status}</Badge>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      {new Date(r.requestedAt).toLocaleString()}
+                    </TableCell>
                   </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {history.map((r) => (
-                    <TableRow key={r._id}>
-                      <TableCell className="font-medium">
-                        {r.teamName}
-                      </TableCell>
-                      <TableCell>{r.requesterName}</TableCell>
-                      <TableCell>
-                        {r.status === "approved" ? (
-                          <Badge
-                            variant="outline"
-                            className="bg-green-600 text-white hover:bg-green-600"
-                          >
-                            {r.status}
-                          </Badge>
-                        ) : r.status === "rejected" ? (
-                          <Badge variant="destructive">{r.status}</Badge>
-                        ) : (
-                          <Badge variant="outline">{r.status}</Badge>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {new Date(r.requestedAt).toLocaleString()}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            ) : (
-              <div className="text-sm text-muted-foreground">
-                No past requests.
-              </div>
-            )}
-          </CardContent>
-        </Card>
+                ))}
+              </TableBody>
+            </Table>
+          ) : (
+            <div className="flex flex-col items-center justify-center border rounded-md py-12 text-center text-muted-foreground">
+              <Inbox className="h-8 w-8 mb-2" />
+              <div>No past requests</div>
+            </div>
+          )}
+        </div>
       </div>
     </DashboardLayout>
   );

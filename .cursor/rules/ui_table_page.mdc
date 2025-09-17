@@ -1,0 +1,192 @@
+---
+alwaysApply: false
+---
+
+Rule Name: ui_table_page
+Description: Standard UI layout for list pages with a main heading on the left, a primary action button on the right that opens a confirmation/modal (or form) before executing, and a table rendered directly below (no Card wrapper).
+
+# UI Table Page Pattern
+
+## Intent
+
+Use this layout for pages that primarily display a list/table and have a single prominent action (e.g., "Create", "Request", "Invite").
+
+## Layout
+
+- Heading row:
+  - Left: Main page title and optional short description.
+  - Right: Primary action button.
+- Confirmation:
+  - Clicking the action button opens a modal to confirm (or present a simple form) before executing.
+  - Confirm button shows a loading state during submission and disables inputs.
+- Table section:
+  - Render the table directly (do NOT wrap in a Card).
+  - Optional small section heading above the table (can be omitted).
+
+## Required Behaviors
+
+- Primary action button alignment: right-aligned within the header row.
+- Confirmation flow: modal with "Cancel" and "Confirm" actions.
+- Loading UX: the confirm button displays a spinner/text when submitting; disable both buttons during submission.
+- Empty state: center a larger message with an icon when there are no rows.
+
+## Shadcn/Tailwind Reference
+
+- Header row container: `flex items-center gap-2 justify-end` (use `mr-auto` on any left helper to keep right alignment).
+- Section heading above table: `text-sm font-medium text-muted-foreground`.
+- Table: use `components/ui/table` directly without `Card`.
+- Modal: `components/ui/dialog` with `Dialog`, `DialogContent`, `DialogHeader`, `DialogTitle`.
+- Buttons:
+  - Primary: `components/ui/gradient-button` with `isLoading` and `loadingText` for submission.
+  - Secondary: `components/ui/button` with `variant="outline"` for Cancel.
+
+## Example Structure (JSX outline)
+
+```
+<div className="space-y-4">
+  <div>
+    <h2 className="text-xl font-semibold tracking-tight">Page Title</h2>
+    <p className="text-sm text-muted-foreground">Short description.</p>
+  </div>
+
+  <div className="flex items-center gap-2 justify-end">
+    {/* Optional helper on the left when needed */}
+    {/* <span className="text-xs text-muted-foreground mr-auto">Helper text</span> */}
+    <div className="min-w-[220px]">
+      <GradientButton onClick={openConfirm} disabled={isSubmitting}>
+        Primary Action
+      </GradientButton>
+    </div>
+  </div>
+
+  <div className="space-y-2">
+    {/* Optional section heading */}
+    {/* <h3 className="text-sm font-medium text-muted-foreground">Your Items</h3> */}
+    {/* Table here (no Card) */}
+  </div>
+
+  <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+    <DialogContent className="sm:max-w-[480px]">
+      <DialogHeader>
+        <DialogTitle>Confirm Action</DialogTitle>
+      </DialogHeader>
+      <div className="space-y-4">
+        <p className="text-sm text-muted-foreground">Confirmation message.</p>
+        <div className="flex items-center justify-end gap-2">
+          <Button variant="outline" onClick={onCancel} disabled={isSubmitting}>Cancel</Button>
+          <GradientButton onClick={onConfirm} isLoading={isSubmitting} loadingText="Working..." disabled={isSubmitting}>
+            Confirm
+          </GradientButton>
+        </div>
+      </div>
+    </DialogContent>
+  </Dialog>
+</div>
+```
+
+## Do / Don’t
+
+- Do: keep the main title concise; use a muted description.
+- Do: show confirm modal before irreversible or notable actions.
+- Do: right-align the primary action in the header row.
+- Don’t: wrap the table in a `Card`.
+- Don’t: show inline spinners outside the confirm modal; use button `isLoading`.
+- Do: show a centered empty state with an icon when no data is present.
+
+## Notes
+
+- Use the global `useToast` hook for success/error messages (no `variant` prop).
+- Disable the primary action and confirm button appropriately when a required context (e.g., team) is missing.
+  Rule Name: ui_table_page
+  Description: Standard UI layout for list pages with a main heading on the left, a primary action button on the right that opens a confirmation/modal (or form) before executing, and a table rendered directly below (no Card wrapper).
+
+# UI Table Page Pattern
+
+## Intent
+
+Use this layout for pages that primarily display a list/table and have a single prominent action (e.g., "Create", "Request", "Invite").
+
+## Layout
+
+- Heading row:
+  - Left: Main page title and optional short description.
+  - Right: Primary action button.
+- Confirmation:
+  - Clicking the action button opens a modal to confirm (or present a simple form) before executing.
+  - Confirm button shows a loading state during submission and disables inputs.
+- Table section:
+  - Render the table directly (do NOT wrap in a Card).
+  - Include a small, subtle section heading above the table like "Your Items".
+
+## Required Behaviors
+
+- Primary action button alignment: right-aligned within the header row.
+- Confirmation flow: modal with "Cancel" and "Confirm" actions.
+- Loading UX: the confirm button displays a spinner/text when submitting; disable both buttons during submission.
+- Empty state: beneath the table heading, show a small muted message when there are no rows.
+
+## Shadcn/Tailwind Reference
+
+- Header row container: `flex items-center gap-2 justify-end` (use `mr-auto` on any left helper to keep right alignment).
+- Section heading above table: `text-sm font-medium text-muted-foreground`.
+- Table: use `components/ui/table` directly without `Card`.
+- Modal: `components/ui/dialog` with `Dialog`, `DialogContent`, `DialogHeader`, `DialogTitle`.
+- Buttons:
+  - Primary: `components/ui/gradient-button` with `isLoading` and `loadingText` for submission.
+  - Secondary: `components/ui/button` with `variant="outline"` for Cancel.
+
+## Example Structure (JSX outline)
+
+```
+<div className="space-y-4">
+  <div>
+    <h2 className="text-xl font-semibold tracking-tight">Page Title</h2>
+    <p className="text-sm text-muted-foreground">Short description.</p>
+  </div>
+
+  <div className="flex items-center gap-2 justify-end">
+    {/* Optional helper on the left when needed */}
+    {/* <span className="text-xs text-muted-foreground mr-auto">Helper text</span> */}
+    <div className="min-w-[220px]">
+      <GradientButton onClick={openConfirm} disabled={isSubmitting}>
+        Primary Action
+      </GradientButton>
+    </div>
+  </div>
+
+  <div className="space-y-2">
+    <h3 className="text-sm font-medium text-muted-foreground">Your Items</h3>
+    {/* Table here (no Card) */}
+  </div>
+
+  <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+    <DialogContent className="sm:max-w-[480px]">
+      <DialogHeader>
+        <DialogTitle>Confirm Action</DialogTitle>
+      </DialogHeader>
+      <div className="space-y-4">
+        <p className="text-sm text-muted-foreground">Confirmation message.</p>
+        <div className="flex items-center justify-end gap-2">
+          <Button variant="outline" onClick={onCancel} disabled={isSubmitting}>Cancel</Button>
+          <GradientButton onClick={onConfirm} isLoading={isSubmitting} loadingText="Working..." disabled={isSubmitting}>
+            Confirm
+          </GradientButton>
+        </div>
+      </div>
+    </DialogContent>
+  </Dialog>
+</div>
+```
+
+## Do / Don’t
+
+- Do: keep the main title concise; use a muted description.
+- Do: show confirm modal before irreversible or notable actions.
+- Do: right-align the primary action in the header row.
+- Don’t: wrap the table in a `Card`.
+- Don’t: show inline spinners outside the confirm modal; use button `isLoading`.
+
+## Notes
+
+- Use the global `useToast` hook for success/error messages (no `variant` prop).
+- Disable the primary action and confirm button appropriately when a required context (e.g., team) is missing.

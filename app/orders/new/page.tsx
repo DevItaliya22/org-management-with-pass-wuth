@@ -12,7 +12,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 export default function NewOrderPage() {
-  const { session, isLoading, isReseller } = useRole();
+  const { session, isLoading,  isStaff ,isOwner } = useRole();
   const categories = useQuery(api.orders.listActiveCategories, {});
   const createOrder = useMutation(api.orders.createOrder);
 
@@ -30,7 +30,7 @@ export default function NewOrderPage() {
   const [msg, setMsg] = useState<string | null>(null);
 
   if (isLoading) return <div className="p-4">Loading…</div>;
-  if (!isReseller) return <div className="p-4">Not authorized</div>;
+  if(isStaff || isOwner) return <div className="p-4">Not authorized</div>;
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

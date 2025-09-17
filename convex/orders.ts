@@ -36,14 +36,22 @@ export const createOrder = mutation({
   handler: async (ctx, args) => {
     const { userId, user } = await requireViewer(ctx);
 
-    // Verify membership: reseller admin or member of the team
+    // Only non-owner/non-staff can create orders (reseller-side users of any kind)
+    if (user.role === "owner" || user.role === "staff") {
+      throw new Error("Not authorized to create orders");
+    }
+
+    // Verify membership in the team: allow default_member and active_member; block suspended
     const membership = await ctx.db
       .query("resellerMembers")
       .withIndex("by_user", (q: any) => q.eq("userId", userId))
       .filter((q: any) => q.eq(q.field("teamId"), args.teamId))
       .first();
-    if (!membership || membership.status !== "active_member") {
-      throw new Error("Not a member of this team or inactive");
+    if (!membership) {
+      throw new Error("No membership for this team");
+    }
+    if (membership.status === "suspended_member") {
+      throw new Error("Membership suspended");
     }
 
     const now = Date.now();
@@ -108,19 +116,23 @@ export const getOrderById = query({
     // Local ACL: owner → all; creator → yes; staff → only if picked; reseller admin → team orders
     if (user.role === "owner") return order;
     if (order.createdByUserId === userId) return order;
-    if (user.role === "staff" && order.pickedByStaffUserId === userId) return order;
+    if (user.role === "staff" && order.pickedByStaffUserId === userId)
+      return order;
     if (user.role === "reseller") {
       const membership = await ctx.db
         .query("resellerMembers")
         .withIndex("by_user", (q: any) => q.eq("userId", userId))
         .filter((q: any) => q.eq(q.field("teamId"), order.teamId))
         .first();
-      if (membership && membership.status === "active_member" && membership.role === "admin") {
+      if (
+        membership &&
+        membership.status === "active_member" &&
+        membership.role === "admin"
+      ) {
         return order;
       }
     }
     throw new Error("Not authorized");
-    return order;
   },
 });
 
@@ -199,7 +211,8 @@ export const listOrdersForReseller = query({
         .withIndex("by_user", (q: any) => q.eq("userId", userId))
         .filter((q: any) => q.eq(q.field("teamId"), args.teamId))
         .first();
-      if (!membership || membership.status !== "active_member") throw new Error("Not a member");
+      if (!membership || membership.status !== "active_member")
+        throw new Error("Not a member");
       const isAdmin = membership.role === "admin";
       if (!isAdmin) {
         // members see only their own
@@ -296,30 +309,68 @@ export const listOrdersForViewer = query({
         .order("desc")
         .paginate(args.paginationOpts);
     }
+    if (user.role === "staff") {
+      // Staff: only orders picked by the current staff
+      return await ctx.db
+        .query("orders")
+        .withIndex("by_picked_by", (q) => q.eq("pickedByStaffUserId", userId))
+        .order("desc")
+        .paginate(args.paginationOpts);
+    }
     if (user.role === "reseller") {
       const membership = await ctx.db
         .query("resellerMembers")
         .withIndex("by_user", (q: any) => q.eq("userId", userId))
         .first();
-      if (!membership || membership.status !== "active_member") {
-        return await ctx.db
+
+      // Base sets: own orders and read-access orders
+      const [ownPage, readAccessList,writeAccessList] = await Promise.all([
+        ctx.db
           .query("orders")
           .withIndex("by_created_by", (q) => q.eq("createdByUserId", userId))
           .order("desc")
-          .paginate(args.paginationOpts);
-      }
-      if (membership.role === "admin") {
-        return await ctx.db
+          .paginate(args.paginationOpts),
+        ctx.db
+          .query("orders")
+          .withIndex("by_read_access", (q) =>
+            q.eq("readAccessUserIds", [userId]),
+          )
+          .order("desc")
+          .collect(),
+        ctx.db
+          .query("orders")
+          .withIndex("by_write_access", (q) =>
+            q.eq("writeAccessUserIds", [userId]),
+          )
+          .order("desc")
+          .collect(),
+      ]);
+
+      let combined = [...ownPage.page, ...readAccessList, ...writeAccessList];
+
+      // If admin of a team (active_member), include team-wide orders
+      if (
+        membership &&
+        membership.status === "active_member" &&
+        membership.role === "admin"
+      ) {
+        const teamPage = await ctx.db
           .query("orders")
           .withIndex("by_team", (q) => q.eq("teamId", membership.teamId))
           .order("desc")
           .paginate(args.paginationOpts);
+        combined = [...combined, ...teamPage.page];
       }
-      return await ctx.db
-        .query("orders")
-        .withIndex("by_created_by", (q) => q.eq("createdByUserId", userId))
-        .order("desc")
-        .paginate(args.paginationOpts);
+
+      // De-duplicate by _id, sort by createdAt desc, and slice to page size
+      const dedupMap = new Map<string, Doc<"orders">>();
+      for (const o of combined) dedupMap.set(String((o as any)._id), o as any);
+      const sorted = Array.from(dedupMap.values()).sort(
+        (a: any, b: any) => b.createdAt - a.createdAt,
+      );
+      const numItems = (args.paginationOpts as any).numItems ?? 20;
+      const page = sorted.slice(0, numItems);
+      return { page, isDone: true, continueCursor: null } as any;
     }
     // Other roles: return empty page
     return { page: [], isDone: true, continueCursor: null } as any;
@@ -356,7 +407,7 @@ export const getUserLabels = query({
   args: { userIds: v.array(v.id("users")) },
   returns: v.record(
     v.id("users"),
-    v.object({ name: v.optional(v.string()), email: v.string() })
+    v.object({ name: v.optional(v.string()), email: v.string() }),
   ),
   handler: async (ctx, args) => {
     const result: Record<string, { name?: string; email: string }> = {};
@@ -374,7 +425,7 @@ export const getUserTeamRoles = query({
   args: { teamId: v.id("teams"), userIds: v.array(v.id("users")) },
   returns: v.record(
     v.id("users"),
-    v.union(v.literal("admin"), v.literal("member"))
+    v.union(v.literal("admin"), v.literal("member")),
   ),
   handler: async (ctx, args) => {
     const out: Record<string, "admin" | "member"> = {};
@@ -418,7 +469,10 @@ export const toggleCategoryActive = mutation({
     if (user.role !== "owner") throw new Error("Not authorized");
     const cat = await ctx.db.get(args.categoryId);
     if (!cat) throw new Error("Category not found");
-    await ctx.db.patch(args.categoryId, { isActive: args.isActive, updatedAt: Date.now() });
+    await ctx.db.patch(args.categoryId, {
+      isActive: args.isActive,
+      updatedAt: Date.now(),
+    });
     return null;
   },
 });
@@ -431,7 +485,11 @@ export const updateCategory = mutation({
     if (user.role !== "owner") throw new Error("Not authorized");
     const cat = await ctx.db.get(args.categoryId);
     if (!cat) throw new Error("Category not found");
-    await ctx.db.patch(args.categoryId, { name: args.name, slug: args.slug, updatedAt: Date.now() });
+    await ctx.db.patch(args.categoryId, {
+      name: args.name,
+      slug: args.slug,
+      updatedAt: Date.now(),
+    });
     return null;
   },
 });
@@ -483,7 +541,10 @@ export const passOrder = mutation({
     const passedList = order.orderPassedByUserId || [];
     if (!passedList.some((p: any) => p.userId === userId)) {
       passedList.push({ userId, passedAt: now, reason: args.reason });
-      await ctx.db.patch(args.orderId, { orderPassedByUserId: passedList, updatedAt: now });
+      await ctx.db.patch(args.orderId, {
+        orderPassedByUserId: passedList,
+        updatedAt: now,
+      });
     }
 
     await ctx.db.insert("auditLogs", {
@@ -507,8 +568,10 @@ export const moveToInProgress = mutation({
     if (user.role !== "staff") throw new Error("Not authorized");
     const order = await ctx.db.get(args.orderId);
     if (!order) throw new Error("Order not found");
-    if (order.pickedByStaffUserId !== userId) throw new Error("Only picking staff can start work");
-    if (!(order.status === "picked" || order.status === "on_hold")) throw new Error("Invalid status");
+    if (order.pickedByStaffUserId !== userId)
+      throw new Error("Only picking staff can start work");
+    if (!(order.status === "picked" || order.status === "on_hold"))
+      throw new Error("Invalid status");
 
     const now = Date.now();
     await ctx.db.patch(args.orderId, { status: "in_progress", updatedAt: now });
@@ -532,11 +595,17 @@ export const holdOrder = mutation({
     if (user.role !== "staff") throw new Error("Not authorized");
     const order = await ctx.db.get(args.orderId);
     if (!order) throw new Error("Order not found");
-    if (order.pickedByStaffUserId !== userId) throw new Error("Only picking staff can hold");
-    if (!(order.status === "picked" || order.status === "in_progress")) throw new Error("Invalid status");
+    if (order.pickedByStaffUserId !== userId)
+      throw new Error("Only picking staff can hold");
+    if (!(order.status === "picked" || order.status === "in_progress"))
+      throw new Error("Invalid status");
 
     const now = Date.now();
-    await ctx.db.patch(args.orderId, { status: "on_hold", holdReason: args.reason, updatedAt: now });
+    await ctx.db.patch(args.orderId, {
+      status: "on_hold",
+      holdReason: args.reason,
+      updatedAt: now,
+    });
     await ctx.db.insert("auditLogs", {
       actorUserId: userId,
       entity: "order",
@@ -558,11 +627,16 @@ export const resumeOrder = mutation({
     if (user.role !== "staff") throw new Error("Not authorized");
     const order = await ctx.db.get(args.orderId);
     if (!order) throw new Error("Order not found");
-    if (order.pickedByStaffUserId !== userId) throw new Error("Only picking staff can resume");
+    if (order.pickedByStaffUserId !== userId)
+      throw new Error("Only picking staff can resume");
     if (order.status !== "on_hold") throw new Error("Order not on hold");
 
     const now = Date.now();
-    await ctx.db.patch(args.orderId, { status: "in_progress", holdReason: undefined, updatedAt: now });
+    await ctx.db.patch(args.orderId, {
+      status: "in_progress",
+      holdReason: undefined,
+      updatedAt: now,
+    });
     await ctx.db.insert("auditLogs", {
       actorUserId: userId,
       entity: "order",
@@ -589,8 +663,10 @@ export const submitFulfilment = mutation({
     if (user.role !== "staff") throw new Error("Not authorized");
     const order = await ctx.db.get(args.orderId);
     if (!order) throw new Error("Order not found");
-    if (order.pickedByStaffUserId !== userId) throw new Error("Only picking staff can submit fulfilment");
-    if (!(order.status === "in_progress" || order.status === "on_hold")) throw new Error("Invalid status");
+    if (order.pickedByStaffUserId !== userId)
+      throw new Error("Only picking staff can submit fulfilment");
+    if (!(order.status === "in_progress" || order.status === "on_hold"))
+      throw new Error("Invalid status");
 
     const now = Date.now();
     await ctx.db.patch(args.orderId, {
@@ -623,7 +699,8 @@ export const completeOrder = mutation({
     if (user.role !== "reseller") throw new Error("Not authorized");
     const order = await ctx.db.get(args.orderId);
     if (!order) throw new Error("Order not found");
-    if (order.status !== "fulfil_submitted") throw new Error("Order not ready to complete");
+    if (order.status !== "fulfil_submitted")
+      throw new Error("Order not ready to complete");
 
     // Authorization: reseller admin of the team OR the member who created the order
     let canComplete = false;
@@ -635,7 +712,11 @@ export const completeOrder = mutation({
         .withIndex("by_user", (q: any) => q.eq("userId", userId))
         .filter((q: any) => q.eq(q.field("teamId"), order.teamId))
         .first();
-      if (membership && membership.status === "active_member" && membership.role === "admin") {
+      if (
+        membership &&
+        membership.status === "active_member" &&
+        membership.role === "admin"
+      ) {
         canComplete = true;
       }
     }
@@ -656,7 +737,11 @@ export const completeOrder = mutation({
 });
 
 export const raiseDispute = mutation({
-  args: { orderId: v.id("orders"), reason: v.string(), attachmentFileIds: v.optional(v.array(v.id("files"))) },
+  args: {
+    orderId: v.id("orders"),
+    reason: v.string(),
+    attachmentFileIds: v.optional(v.array(v.id("files"))),
+  },
   returns: v.null(),
   handler: async (ctx, args) => {
     const { userId, user } = await requireViewer(ctx);
@@ -672,8 +757,12 @@ export const raiseDispute = mutation({
       .withIndex("by_user", (q: any) => q.eq("userId", userId))
       .filter((q: any) => q.eq(q.field("teamId"), order.teamId))
       .first();
-    const isAdmin = membership && membership.status === "active_member" && membership.role === "admin";
-    if (!isAdmin && order.createdByUserId !== userId) throw new Error("Not authorized to dispute this order");
+    const isAdmin =
+      membership &&
+      membership.status === "active_member" &&
+      membership.role === "admin";
+    if (!isAdmin && order.createdByUserId !== userId)
+      throw new Error("Not authorized to dispute this order");
 
     const now = Date.now();
     await ctx.db.insert("disputes", {
@@ -722,7 +811,7 @@ export const getDisputesByOrder = query({
       resolvedAt: v.optional(v.number()),
       resolutionNotes: v.optional(v.string()),
       adjustmentAmountUsd: v.optional(v.number()),
-    })
+    }),
   ),
   handler: async (ctx, args) => {
     const disputes = await ctx.db
@@ -746,5 +835,3 @@ export const getDisputesByOrder = query({
     }));
   },
 });
-
-

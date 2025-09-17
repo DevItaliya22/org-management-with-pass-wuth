@@ -4,12 +4,19 @@ import DashboardLayout from "@/components/Dashboard/DashboardLayout";
 import { useRole } from "@/hooks/use-role";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { useState } from "react";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import GradientButton from "@/components/ui/gradient-button";
 import {
   Dialog,
   DialogContent,
@@ -28,11 +35,21 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Switch } from "@/components/ui/switch";
-import { Pencil } from "lucide-react";
+import { Pencil, Inbox } from "lucide-react";
 import { notFound } from "next/navigation";
 
 export default function CategoriesPage() {
   const { isLoading, isOwner } = useRole();
+  const [name, setName] = useState("");
+  const [slug, setSlug] = useState("");
+  const [msg, setMsg] = useState<string | null>(null);
+  const [creating, setCreating] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [pendingToggle, setPendingToggle] = useState<{
+    id: string;
+    next: boolean;
+  } | null>(null);
+
   // Always call hooks; use stable positions and gate after
   const cats = useQuery(
     api.orders.listAllCategories,
@@ -42,15 +59,6 @@ export default function CategoriesPage() {
   const toggleActive = useMutation(api.orders.toggleCategoryActive);
   const updateCat = useMutation(api.orders.updateCategory);
 
-  const [name, setName] = useState("");
-  const [slug, setSlug] = useState("");
-  const [msg, setMsg] = useState<string | null>(null);
-  const [confirmOpen, setConfirmOpen] = useState(false);
-  const [pendingToggle, setPendingToggle] = useState<{
-    id: string;
-    next: boolean;
-  } | null>(null);
-
   if (isLoading) return <div className="p-4">Loading…</div>;
   if (!isOwner) return notFound();
 
@@ -58,115 +66,162 @@ export default function CategoriesPage() {
     e.preventDefault();
     try {
       setMsg(null);
-      await createCat({ name, slug });
+      setCreating(true);
+      const trimmedName = name.trim();
+      const trimmedSlug = slug.trim();
+      if (!trimmedName || !trimmedSlug) {
+        setMsg("Name and slug are required");
+        return;
+      }
+      await createCat({ name: trimmedName, slug: trimmedSlug });
       setName("");
       setSlug("");
       setMsg("Category created");
     } catch (e: any) {
       setMsg(e?.message || "Failed to create category");
+    } finally {
+      setCreating(false);
     }
   };
 
   return (
     <DashboardLayout>
       <div className="p-4 space-y-4">
-        <div className="flex items-center justify-between">
-          <h1 className="text-xl font-semibold">Categories</h1>
-          <Dialog>
-            <DialogTrigger asChild>
-              <Button>Add Category</Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DHeader>
-                <DTitle>Add Category</DTitle>
-              </DHeader>
-              <form
-                className="grid grid-cols-1 md:grid-cols-3 gap-3"
-                onSubmit={onCreate}
-              >
-                <div>
-                  <Label>Name</Label>
-                  <Input
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                  />
-                </div>
-                <div>
-                  <Label>Slug</Label>
-                  <Input
-                    value={slug}
-                    onChange={(e) => setSlug(e.target.value)}
-                  />
-                </div>
-                <div className="flex items-end">
-                  <Button type="submit">Create</Button>
-                </div>
-                {msg && (
-                  <div className="md:col-span-3 text-sm text-muted-foreground">
-                    {msg}
-                  </div>
-                )}
-              </form>
-            </DialogContent>
-          </Dialog>
-        </div>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>All Categories</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            {cats?.map((c: any) => (
-              <div
-                key={c._id}
-                className="flex items-center justify-between rounded border p-3"
-              >
-                <div className="space-y-1">
-                  <div className="font-medium">{c.name}</div>
-                  <div className="text-xs text-muted-foreground">{c.slug}</div>
-                </div>
-                <div className="flex items-center gap-3">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs text-muted-foreground">
-                      {c.isActive ? "Active" : "Inactive"}
-                    </span>
-                    <Switch
-                      checked={c.isActive}
-                      onCheckedChange={(val) => {
-                        setPendingToggle({ id: c._id, next: val });
-                        setConfirmOpen(true);
-                      }}
+        <div className="flex items-center justify-between gap-2">
+          <div>
+            <h1 className="text-xl font-semibold tracking-tight">Categories</h1>
+            <p className="text-sm text-muted-foreground">
+              Manage category names, slugs and visibility.
+            </p>
+          </div>
+          <div className="min-w-[220px]">
+            <Dialog>
+              <DialogTrigger asChild>
+                <GradientButton>Create Category</GradientButton>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-[520px]">
+                <DHeader>
+                  <DTitle>Add Category</DTitle>
+                </DHeader>
+                <form
+                  className="grid grid-cols-1 md:grid-cols-3 gap-3"
+                  onSubmit={onCreate}
+                >
+                  <div>
+                    <Label>Name</Label>
+                    <Input
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      placeholder="Ex: Electronics"
                     />
                   </div>
-                  <Dialog>
-                    <DialogTrigger asChild>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        aria-label="Edit category"
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent>
-                      <DHeader>
-                        <DTitle>Edit Category</DTitle>
-                      </DHeader>
-                      <EditCategoryForm
-                        id={c._id}
-                        initialName={c.name}
-                        initialSlug={c.slug}
-                        onSave={async (name, slug) => {
-                          await updateCat({ categoryId: c._id, name, slug });
-                        }}
-                      />
-                    </DialogContent>
-                  </Dialog>
-                </div>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
+                  <div>
+                    <Label>Slug</Label>
+                    <Input
+                      value={slug}
+                      onChange={(e) => setSlug(e.target.value)}
+                      placeholder="ex: electronics"
+                    />
+                  </div>
+                  <div className="flex items-end">
+                    <GradientButton
+                      type="submit"
+                      isLoading={creating}
+                      loadingText="Creating..."
+                      disabled={creating || !name.trim() || !slug.trim()}
+                    >
+                      Create
+                    </GradientButton>
+                  </div>
+                  {msg && (
+                    <div className="md:col-span-3 text-sm text-muted-foreground">
+                      {msg}
+                    </div>
+                  )}
+                </form>
+              </DialogContent>
+            </Dialog>
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          <h3 className="text-sm font-medium text-muted-foreground">
+            All Categories
+          </h3>
+          {cats && cats.length > 0 ? (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-[40%]">Name</TableHead>
+                  <TableHead className="w-[35%]">Slug</TableHead>
+                  <TableHead className="w-[15%]">Status</TableHead>
+                  <TableHead className="text-right w-[10%]">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {cats.map((c: any) => (
+                  <TableRow key={c._id}>
+                    <TableCell className="font-medium">{c.name}</TableCell>
+                    <TableCell>
+                      <span className="text-xs text-muted-foreground">
+                        {c.slug}
+                      </span>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-muted-foreground">
+                          {c.isActive ? "Active" : "Inactive"}
+                        </span>
+                        <Switch
+                          checked={c.isActive}
+                          onCheckedChange={(val) => {
+                            setPendingToggle({ id: c._id, next: val });
+                            setConfirmOpen(true);
+                          }}
+                        />
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Dialog>
+                        <DialogTrigger asChild>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            aria-label="Edit category"
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent>
+                          <DHeader>
+                            <DTitle>Edit Category</DTitle>
+                          </DHeader>
+                          <EditCategoryForm
+                            id={c._id}
+                            initialName={c.name}
+                            initialSlug={c.slug}
+                            onSave={async (name, slug) => {
+                              await updateCat({
+                                categoryId: c._id,
+                                name,
+                                slug,
+                              });
+                            }}
+                          />
+                        </DialogContent>
+                      </Dialog>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          ) : cats && cats.length === 0 ? (
+            <div className="flex flex-col items-center justify-center border rounded-md py-12 text-center text-muted-foreground">
+              <Inbox className="h-8 w-8 mb-2" />
+              <div>No categories yet</div>
+            </div>
+          ) : null}
+        </div>
         <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
           <AlertDialogContent>
             <AlertDialogHeader>

@@ -42,9 +42,9 @@ export function Header({ className }: HeaderProps = {}) {
       return { label: "Reseller Admin", icon: Users };
     if (roleState.isResellerMember)
       return { label: "Reseller Member", icon: User };
+    if (roleState.isResellerDefaultMember) return { label: "Reseller User", icon: Users };
 
     // Fallbacks
-    if (roleState.isReseller) return { label: "Reseller", icon: Users };
     return { label: "User", icon: User };
   };
 

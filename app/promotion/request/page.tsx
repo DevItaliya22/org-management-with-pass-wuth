@@ -6,8 +6,6 @@ import { api } from "@/convex/_generated/api";
 import { notFound } from "next/navigation";
 import { useRole } from "@/hooks/use-role";
 import { useEffect, useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
   Table,
@@ -18,12 +16,24 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import GradientButton from "@/components/ui/gradient-button";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { useToast } from "@/hooks/use-toast";
+import { Button } from "@/components/ui/button";
+import { Inbox } from "lucide-react";
 
 export default function PromotionPage() {
   const { isLoading, isResellerDefaultMember, session } = useRole();
 
   const [ready, setReady] = useState(false);
   const [canView, setCanView] = useState<boolean | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const { toast } = useToast();
 
   useEffect(() => {
     if (!isLoading) {
@@ -33,7 +43,7 @@ export default function PromotionPage() {
   }, [isLoading, isResellerDefaultMember]);
 
   const teamId = session?.team?._id;
-  
+
   const myRequests = useQuery(
     api.teams.listMyPromotionRequests,
     ready ? {} : undefined,
@@ -45,7 +55,22 @@ export default function PromotionPage() {
 
   const sendRequest = async () => {
     if (!teamId) return;
-    await requestPromotion({ teamId });
+    try {
+      setIsSubmitting(true);
+      await requestPromotion({ teamId });
+      toast({
+        title: "Request sent",
+        description: "Your admin promotion request has been submitted.",
+      });
+      setConfirmOpen(false);
+    } catch (error) {
+      toast({
+        title: "Failed to send request",
+        description: "Please try again.",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -58,67 +83,100 @@ export default function PromotionPage() {
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
-          <div className="min-w-[220px]">
-            <GradientButton onClick={sendRequest} disabled={!teamId}>
-              Request Admin Promotion
-            </GradientButton>
-          </div>
+        <div className="flex items-center gap-2 justify-end">
           {!teamId && (
-            <span className="text-xs text-muted-foreground">
+            <span className="text-xs text-muted-foreground mr-auto">
               Join or select a team to request promotion.
             </span>
           )}
+          <div className="min-w-[220px]">
+            <GradientButton
+              onClick={() => setConfirmOpen(true)}
+              disabled={!teamId || isSubmitting}
+            >
+              Request Admin Promotion
+            </GradientButton>
+          </div>
         </div>
 
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle>Your Requests</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {myRequests && myRequests.length > 0 ? (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Team</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="text-right">Requested At</TableHead>
+        <div className="space-y-2">
+          {myRequests && myRequests.length > 0 ? (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Team</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead className="text-right">Requested At</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {myRequests.map((r) => (
+                  <TableRow key={r._id}>
+                    <TableCell className="font-medium">{r.teamName}</TableCell>
+                    <TableCell>
+                      {r.status === "approved" ? (
+                        <Badge
+                          variant="outline"
+                          className="bg-green-600 text-white hover:bg-green-600"
+                        >
+                          {r.status}
+                        </Badge>
+                      ) : r.status === "rejected" ? (
+                        <Badge variant="destructive">{r.status}</Badge>
+                      ) : (
+                        <Badge variant="outline">{r.status}</Badge>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      {new Date(r.requestedAt).toLocaleString()}
+                    </TableCell>
                   </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {myRequests.map((r) => (
-                    <TableRow key={r._id}>
-                      <TableCell className="font-medium">
-                        {r.teamName}
-                      </TableCell>
-                      <TableCell>
-                        {r.status === "approved" ? (
-                          <Badge
-                            variant="outline"
-                            className="bg-green-600 text-white hover:bg-green-600"
-                          >
-                            {r.status}
-                          </Badge>
-                        ) : r.status === "rejected" ? (
-                          <Badge variant="destructive">{r.status}</Badge>
-                        ) : (
-                          <Badge variant="outline">{r.status}</Badge>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {new Date(r.requestedAt).toLocaleString()}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            ) : (
-              <div className="text-sm text-muted-foreground">
-                No requests yet.
+                ))}
+              </TableBody>
+            </Table>
+          ) : (
+            <div className="py-24 flex flex-col items-center justify-center text-center">
+              <Inbox className="h-12 w-12 text-muted-foreground mb-3" />
+              <div className="text-lg font-medium text-muted-foreground">
+                No requests on this page
               </div>
-            )}
-          </CardContent>
-        </Card>
+              <div className="text-sm text-muted-foreground">
+                You’ll see your admin promotion requests here when you have any.
+              </div>
+            </div>
+          )}
+        </div>
+
+        <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+          <DialogContent className="sm:max-w-[480px]">
+            <DialogHeader>
+              <DialogTitle>Confirm Request</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                Do you want to request the owner to become reseller admin?
+              </p>
+              <div className="flex items-center justify-end gap-2">
+                <Button
+                  variant="outline"
+                  type="button"
+                  onClick={() => setConfirmOpen(false)}
+                  disabled={isSubmitting}
+                >
+                  Cancel
+                </Button>
+                <GradientButton
+                  onClick={sendRequest}
+                  isLoading={isSubmitting}
+                  loadingText="Requesting..."
+                  disabled={isSubmitting}
+                >
+                  Confirm
+                </GradientButton>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
     </DashboardLayout>
   );

@@ -3,19 +3,16 @@
 import DashboardLayout from "@/components/Dashboard/DashboardLayout";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import { notFound, useRouter } from "next/navigation";
+import { notFound } from "next/navigation";
 import React, { useState } from "react";
 import { useRole } from "@/hooks/use-role";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Label } from "@/components/ui/label";
-import { Input } from "@/components/ui/input";
+import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
-import { ArrowLeft, Loader2, Save } from "lucide-react";
+import { Loader2, Copy } from "lucide-react";
 import { Id } from "@/convex/_generated/dataModel";
-import Link from "next/link";
 
 interface UserDetailPageProps {
   params: Promise<{
@@ -25,7 +22,6 @@ interface UserDetailPageProps {
 
 export default function UserDetailPage({ params }: UserDetailPageProps) {
   const { isLoading, isResellerAdmin, isOwner, session } = useRole();
-  const router = useRouter();
 
   const [isUpdating, setIsUpdating] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
@@ -110,14 +106,10 @@ export default function UserDetailPage({ params }: UserDetailPageProps) {
     return (
       <DashboardLayout>
         <div className="text-center py-8">
-          <h2 className="text-xl font-semibold">User Not Found</h2>
+          <h2 className="text-2xl font-semibold">User Not Found</h2>
           <p className="text-muted-foreground">
             The requested user could not be found.
           </p>
-          <Button className="mt-4" onClick={() => router.back()}>
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back
-          </Button>
         </div>
       </DashboardLayout>
     );
@@ -125,60 +117,60 @@ export default function UserDetailPage({ params }: UserDetailPageProps) {
 
   return (
     <DashboardLayout>
-      <div className="space-y-6">
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-4">
-            <Button variant="outline" size="sm" onClick={() => router.back()}>
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Back
-            </Button>
-            <div>
-              <h2 className="text-2xl font-semibold tracking-tight">
-                {userDetails.name || "User Details"}
-              </h2>
-              <p className="text-sm text-muted-foreground">
-                View and manage user information
-              </p>
-            </div>
-          </div>
-        </div>
-
-        {/* User Information */}
-        <div className="grid gap-6 md:grid-cols-2">
-          {/* Basic Information */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Basic Information</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label>Name</Label>
-                <Input
-                  value={userDetails.name || "No name set"}
-                  disabled
-                  className="bg-muted/50"
-                />
+      <div className="space-y-8 px-4 md:px-6 lg:px-8">
+        {/* Primary details - full width, less carded */}
+        <section className="rounded-lg bg-muted/20 p-5">
+          <h3 className="text-lg font-semibold text-muted-foreground mb-4">
+            Profile
+          </h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <dl className="space-y-3 md:col-span-2">
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <dt className="text-base text-muted-foreground">Email</dt>
+                  <dd className="text-xl font-medium break-all">
+                    {userDetails.email}
+                  </dd>
+                </div>
+                <Button
+                  variant="outline"
+                  size="default"
+                  onClick={async () => {
+                    try {
+                      await navigator.clipboard.writeText(userDetails.email);
+                      setMsg("Email copied to clipboard");
+                    } catch {
+                      setMsg("Failed to copy email");
+                    }
+                  }}
+                  aria-label="Copy email"
+                >
+                  <Copy className="h-4 w-4 mr-2" /> Copy
+                </Button>
               </div>
-              <div className="space-y-2">
-                <Label>Email</Label>
-                <Input
-                  value={userDetails.email}
-                  disabled
-                  className="bg-muted/50"
-                />
+            </dl>
+            <dl className="space-y-3">
+              <div className="flex items-center justify-between">
+                <dt className="text-base text-muted-foreground">Name</dt>
+                <dd className="text-lg font-semibold">
+                  {userDetails.name || "No name set"}
+                </dd>
               </div>
-              <div className="space-y-2">
-                <Label>User Role</Label>
-                <div className="flex items-center space-x-2">
+              <Separator className="my-1" />
+              <div className="flex items-center justify-between">
+                <dt className="text-base text-muted-foreground">Role</dt>
+                <dd>
                   <Badge variant="outline">
                     {userDetails.role || "No role set"}
                   </Badge>
-                </div>
+                </dd>
               </div>
-              <div className="space-y-2">
-                <Label>Email Verified</Label>
-                <div className="flex items-center space-x-2">
+              <Separator className="my-1" />
+              <div className="flex items-center justify-between">
+                <dt className="text-base text-muted-foreground">
+                  Email status
+                </dt>
+                <dd>
                   <Badge
                     variant={
                       userDetails.emailVerificationTime
@@ -190,148 +182,108 @@ export default function UserDetailPage({ params }: UserDetailPageProps) {
                       ? "Verified"
                       : "Not Verified"}
                   </Badge>
+                </dd>
+              </div>
+            </dl>
+          </div>
+        </section>
+
+        {/* Team & controls */}
+        <section className="rounded-lg bg-muted/20 p-5">
+          <h3 className="text-lg font-semibold text-muted-foreground mb-4">
+            Team & Access
+          </h3>
+          {userDetails.resellerMember ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-base text-muted-foreground">
+                    Team role
+                  </span>
+                  <Badge
+                    variant={
+                      userDetails.resellerMember.role === "admin"
+                        ? "default"
+                        : "secondary"
+                    }
+                  >
+                    {userDetails.resellerMember.role}
+                  </Badge>
+                </div>
+                <Separator />
+                <div className="flex items-center justify-between">
+                  <span className="text-base text-muted-foreground">
+                    Status
+                  </span>
+                  <Badge
+                    variant={
+                      userDetails.resellerMember.status === "active_member"
+                        ? "default"
+                        : userDetails.resellerMember.status ===
+                            "suspended_member"
+                          ? "destructive"
+                          : "secondary"
+                    }
+                  >
+                    {userDetails.resellerMember.status.replace("_", " ")}
+                  </Badge>
                 </div>
               </div>
-            </CardContent>
-          </Card>
 
-          {/* Team Membership */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Team Membership</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {userDetails.resellerMember ? (
-                <>
-                  <div className="space-y-2">
-                    <Label>Team Role</Label>
-                    <div className="flex items-center space-x-2">
-                      <Badge
-                        variant={
-                          userDetails.resellerMember.role === "admin"
-                            ? "default"
-                            : "secondary"
-                        }
-                      >
-                        {userDetails.resellerMember.role}
-                      </Badge>
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Status</Label>
-                    <div className="flex items-center space-x-2">
-                      <Badge
-                        variant={
-                          userDetails.resellerMember.status === "active_member"
-                            ? "default"
-                            : userDetails.resellerMember.status ===
-                                "suspended_member"
-                              ? "destructive"
-                              : "secondary"
-                        }
-                      >
-                        {userDetails.resellerMember.status.replace("_", " ")}
-                      </Badge>
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Active Status</Label>
-                    <div className="flex items-center space-x-2">
-                      <Switch
-                        checked={userDetails.resellerMember.isActive}
-                        onCheckedChange={(checked) =>
-                          handleStatusChange("isActive", checked)
-                        }
-                        disabled={
-                          isUpdating ||
-                          userDetails.resellerMember.role === "admin"
-                        }
-                      />
-                      <span className="text-sm text-muted-foreground">
-                        {userDetails.resellerMember.isActive
-                          ? "Active"
-                          : "Inactive"}
-                      </span>
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Blocked Status</Label>
-                    <div className="flex items-center space-x-2">
-                      <Switch
-                        checked={userDetails.resellerMember.isBlocked}
-                        onCheckedChange={(checked) =>
-                          handleStatusChange("isBlocked", checked)
-                        }
-                        disabled={
-                          isUpdating ||
-                          userDetails.resellerMember.role === "admin"
-                        }
-                      />
-                      <span className="text-sm text-muted-foreground">
-                        {userDetails.resellerMember.isBlocked
-                          ? "Blocked"
-                          : "Not Blocked"}
-                      </span>
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Member Since</Label>
-                    <Input
-                      value={new Date(
-                        userDetails.resellerMember.createdAt,
-                      ).toLocaleDateString()}
-                      disabled
-                      className="bg-muted/50"
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-base text-muted-foreground">
+                    Active
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <Switch
+                      checked={userDetails.resellerMember.isActive}
+                      onCheckedChange={(checked) =>
+                        handleStatusChange("isActive", checked)
+                      }
+                      disabled={
+                        isUpdating ||
+                        userDetails.resellerMember.role === "admin"
+                      }
                     />
+                    <span className="text-base text-muted-foreground">
+                      {userDetails.resellerMember.isActive
+                        ? "Active"
+                        : "Inactive"}
+                    </span>
                   </div>
-                  <div className="space-y-2">
-                    <Label>Last Updated</Label>
-                    <Input
-                      value={new Date(
-                        userDetails.resellerMember.updatedAt,
-                      ).toLocaleDateString()}
-                      disabled
-                      className="bg-muted/50"
+                </div>
+                <Separator />
+                <div className="flex items-center justify-between">
+                  <span className="text-base text-muted-foreground">
+                    Blocked
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <Switch
+                      checked={userDetails.resellerMember.isBlocked}
+                      onCheckedChange={(checked) =>
+                        handleStatusChange("isBlocked", checked)
+                      }
+                      disabled={
+                        isUpdating ||
+                        userDetails.resellerMember.role === "admin"
+                      }
                     />
+                    <span className="text-base text-muted-foreground">
+                      {userDetails.resellerMember.isBlocked
+                        ? "Blocked"
+                        : "Not Blocked"}
+                    </span>
                   </div>
-                </>
-              ) : (
-                <div className="text-center py-4 text-muted-foreground">
-                  User is not a member of any team
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Additional Information */}
-        {userDetails.resellerMember && (
-          <Card>
-            <CardHeader>
-              <CardTitle>Additional Information</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid gap-4 md:grid-cols-2">
-                <div className="space-y-2">
-                  <Label>User ID</Label>
-                  <Input
-                    value={userDetails._id}
-                    disabled
-                    className="bg-muted/50 font-mono text-xs"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Member ID</Label>
-                  <Input
-                    value={userDetails.resellerMember._id}
-                    disabled
-                    className="bg-muted/50 font-mono text-xs"
-                  />
                 </div>
               </div>
-            </CardContent>
-          </Card>
-        )}
+            </div>
+          ) : (
+            <div className="py-2 text-base text-muted-foreground">
+              User is not a member of any team
+            </div>
+          )}
+        </section>
 
         {msg && (
           <Alert>
