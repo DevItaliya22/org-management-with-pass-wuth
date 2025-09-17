@@ -25,6 +25,21 @@ export default function OrderChat({
   const [files, setFiles] = useState<Array<File>>([]);
   const [chatId, setChatId] = useState<Id<"chats"> | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const listEndRef = useRef<HTMLDivElement | null>(null);
+  type OptimisticMessage = {
+    _id: string;
+    chatId: Id<"chats">;
+    senderUserId: Id<"users">;
+    senderName?: string;
+    content?: string;
+    attachmentFileIds?: Array<Id<"files">>;
+    createdAt: number;
+    viewedByUserIds: Array<Id<"users">>;
+    optimistic: true;
+  };
+  const [optimisticMessages, setOptimisticMessages] = useState<
+    Array<OptimisticMessage>
+  >([]);
 
   // Get or create chat for this order
   const getOrCreateChat = useMutation(api.chat.getOrCreateChat);
@@ -35,8 +50,22 @@ export default function OrderChat({
     chatId ? { chatId } : "skip",
   );
 
+  // Get current user to determine message alignment
+  const session = useQuery(api.session.getCurrentUserSession, {});
+  const currentUserId = session?.user?._id as Id<"users"> | undefined;
+
   // Send message mutation
   const sendMessageMutation = useMutation(api.chat.sendMessage);
+
+  // Merge server and optimistic messages for display (server messages first, then optimistic)
+  const displayMessages = ((chatData?.messages as any[]) || []).concat(
+    optimisticMessages as any[],
+  );
+
+  // Auto scroll to bottom when messages update
+  useEffect(() => {
+    listEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [displayMessages.length]);
 
   // Initialize chat when component mounts
   useEffect(() => {
@@ -51,6 +80,23 @@ export default function OrderChat({
     }
   }, [orderId, chatId, getOrCreateChat]);
 
+  // Reconcile optimistic messages once the server message appears
+  useEffect(() => {
+    if (!chatData?.messages?.length || optimisticMessages.length === 0) return;
+    setOptimisticMessages((prev) =>
+      prev.filter((opt) => {
+        const matched = chatData.messages.some((srv) => {
+          return (
+            srv.senderUserId === opt.senderUserId &&
+            srv.content === opt.content &&
+            Math.abs(srv.createdAt - opt.createdAt) < 5000
+          );
+        });
+        return !matched;
+      }),
+    );
+  }, [chatData?.messages, optimisticMessages.length]);
+
   const disabled = !canWrite;
 
   return (
@@ -59,33 +105,58 @@ export default function OrderChat({
         <CardTitle>Chat</CardTitle>
       </CardHeader>
       <CardContent className="flex-1 flex flex-col gap-3">
-        <ScrollArea className="flex-1 h-[55vh] rounded border p-2 bg-card">
-          <div className="space-y-2 text-sm">
-            {chatData?.messages.length === 0 ? (
+        <ScrollArea className="max-h-[60vh] rounded border p-2 bg-card overflow-y-auto">
+          <div className="space-y-3 text-sm">
+            {displayMessages.length === 0 ? (
               <div className="text-muted-foreground text-center py-4">
                 No messages yet. Start the conversation!
               </div>
             ) : (
-              chatData?.messages.map((msg) => (
-                <div key={msg._id} className="space-y-1">
-                  <div className="flex items-center gap-2">
-                    <span className="font-medium text-xs text-muted-foreground">
-                      {msg.senderName}
-                    </span>
-                    <span className="text-xs text-muted-foreground">
-                      {new Date(msg.createdAt).toLocaleTimeString()}
-                    </span>
-                  </div>
-                  {msg.content && <div className="text-sm">{msg.content}</div>}
-                  {msg.attachmentFileIds &&
-                    msg.attachmentFileIds.length > 0 && (
-                      <div className="text-xs text-muted-foreground">
-                        📎 {msg.attachmentFileIds.length} attachment(s)
+              displayMessages.map((msg) => {
+                const isOwn = currentUserId === msg.senderUserId;
+                return (
+                  <div
+                    key={msg._id}
+                    className={`flex ${isOwn ? "justify-end" : "justify-start"}`}
+                  >
+                    <div className="max-w-[80%]">
+                      <div
+                        className={`mb-1 flex items-center gap-2 ${
+                          isOwn ? "justify-end" : "justify-start"
+                        }`}
+                      >
+                        {!isOwn && (
+                          <span className="font-medium text-xs text-muted-foreground">
+                            {msg.senderName}
+                          </span>
+                        )}
+                        <span className="text-xs text-muted-foreground">
+                          {new Date(msg.createdAt).toLocaleTimeString()}
+                        </span>
                       </div>
-                    )}
-                </div>
-              ))
+                      <div
+                        className={`rounded-md px-3 py-2 whitespace-pre-wrap break-words ${
+                          isOwn
+                            ? "bg-primary text-primary-foreground"
+                            : "bg-muted text-foreground"
+                        }`}
+                      >
+                        {msg.content && (
+                          <div className="text-sm">{msg.content}</div>
+                        )}
+                        {msg.attachmentFileIds &&
+                          msg.attachmentFileIds.length > 0 && (
+                            <div className="text-xs opacity-80 mt-1">
+                              📎 {msg.attachmentFileIds.length} attachment(s)
+                            </div>
+                          )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })
             )}
+            <div ref={listEndRef} />
           </div>
         </ScrollArea>
         {/* File chips area (like ChatGPT) */}
@@ -122,20 +193,40 @@ export default function OrderChat({
               return;
 
             try {
+              const optimisticId = `temp-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+              const now = Date.now();
+              const optimistic: OptimisticMessage = {
+                _id: optimisticId,
+                chatId,
+                senderUserId: currentUserId!,
+                senderName:
+                  session?.user?.name || session?.user?.email || "You",
+                content: message.trim() || undefined,
+                createdAt: now,
+                viewedByUserIds: currentUserId ? [currentUserId] : [],
+                optimistic: true,
+              };
+              setOptimisticMessages((prev) => [...prev, optimistic]);
+              setMessage("");
+              setFiles([]);
+
               // For now, we'll just send text messages
               // File upload functionality can be added later
               await sendMessageMutation({
                 orderId: orderId as Id<"orders">,
                 chatId,
-                content: message.trim() || undefined,
+                content: optimistic.content,
                 // attachmentFileIds: files.length > 0 ? [] : undefined, // TODO: implement file upload
               });
 
-              setMessage("");
-              setFiles([]);
+              // Do not remove on success immediately; reconciliation effect will handle it
             } catch (error) {
               console.error("Failed to send message:", error);
               // TODO: Show error toast
+              // Revert optimistic message on error
+              setOptimisticMessages((prev) =>
+                prev.filter((m) => !m.optimistic),
+              );
             }
           }}
         >
