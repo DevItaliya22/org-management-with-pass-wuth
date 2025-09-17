@@ -22,6 +22,16 @@ import DashboardLayout from "@/components/Dashboard/DashboardLayout";
 import OwnerPermissions from "./OwnerPermissions";
 import ResellerAdminPermissions from "./ResellerAdminPermissions";
 import OrderChat from "@/components/OrderChat";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { X, Upload, File, ChevronDown } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 export default function OrderDetailsPage() {
   const {
@@ -73,10 +83,144 @@ export default function OrderDetailsPage() {
 
   const completeOrder = useMutation(api.orders.completeOrder);
   const raiseDispute = useMutation(api.orders.raiseDispute);
+  const fixAndCompleteDispute = useMutation(api.orders.fixAndCompleteDispute);
+  const declineAndCompleteDispute = useMutation(api.orders.declineAndCompleteDispute);
+  const partialRefundAndCompleteDispute = useMutation(api.orders.partialRefundAndCompleteDispute);
 
   const [completing, setCompleting] = useState(false);
   const [disputeOpen, setDisputeOpen] = useState(false);
   const [disputeReason, setDisputeReason] = useState("");
+  const [disputeFiles, setDisputeFiles] = useState<File[]>([]);
+  const [disputeActionOpen, setDisputeActionOpen] = useState(false);
+  const [selectedDispute, setSelectedDispute] = useState<any>(null);
+  const [activeAction, setActiveAction] = useState<'fix' | 'decline' | 'partial' | null>(null);
+  const [resolutionNotes, setResolutionNotes] = useState("");
+  const [adjustmentAmount, setAdjustmentAmount] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+
+  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.target.files || []);
+    setDisputeFiles(prev => [...prev, ...files]);
+  };
+
+  const removeFile = (index: number) => {
+    setDisputeFiles(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const formatFileSize = (bytes: number) => {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  };
+
+  const handleDisputeAction = (dispute: any, action: 'fix' | 'decline' | 'partial') => {
+    setSelectedDispute(dispute);
+    setActiveAction(action);
+    setResolutionNotes("");
+    setAdjustmentAmount("");
+    setDisputeActionOpen(true);
+  };
+
+  const submitDisputeAction = async () => {
+    if (!selectedDispute || !activeAction) return;
+    
+    setSubmitting(true);
+    try {
+      switch (activeAction) {
+        case 'fix':
+          await fixAndCompleteDispute({ 
+            disputeId: selectedDispute._id, 
+            resolutionNotes: resolutionNotes.trim() || undefined 
+          });
+          break;
+        case 'decline':
+          await declineAndCompleteDispute({ 
+            disputeId: selectedDispute._id, 
+            resolutionNotes: resolutionNotes.trim() 
+          });
+          break;
+        case 'partial':
+          await partialRefundAndCompleteDispute({ 
+            disputeId: selectedDispute._id, 
+            adjustmentAmountUsd: parseFloat(adjustmentAmount), 
+            resolutionNotes: resolutionNotes.trim() || undefined 
+          });
+          break;
+      }
+      
+      setDisputeActionOpen(false);
+      setSelectedDispute(null);
+      setActiveAction(null);
+      setResolutionNotes("");
+      setAdjustmentAmount("");
+      router.refresh();
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const getActionTitle = () => {
+    switch (activeAction) {
+      case 'fix': return 'Fix & Complete';
+      case 'decline': return 'Decline & Complete';
+      case 'partial': return 'Partial Refund/Credit';
+      default: return '';
+    }
+  };
+
+  const getActionDescription = () => {
+    switch (activeAction) {
+      case 'fix': return 'Mark this dispute as resolved with no monetary adjustment.';
+      case 'decline': return 'Decline this dispute and mark it as resolved.';
+      case 'partial': return 'Provide a partial refund/credit and mark the dispute as resolved.';
+      default: return '';
+    }
+  };
+
+  const isActionValid = () => {
+    if (activeAction === 'decline') {
+      return resolutionNotes.trim().length > 0;
+    }
+    if (activeAction === 'partial') {
+      const amount = parseFloat(adjustmentAmount);
+      return amount > 0;
+    }
+    return true;
+  };
+
+  const getDisputeDecisionLabel = (status: string) => {
+    switch (status) {
+      case 'approved':
+        return 'Fixed & Completed';
+      case 'declined':
+        return 'Declined & Completed';
+      case 'partial_refund':
+        return 'Partial Refund/Credit';
+      case 'resolved':
+        return 'Resolved';
+      case 'open':
+      default:
+        return 'Open';
+    }
+  };
+
+  const getDisputeBadgeClass = (status: string) => {
+    switch (status) {
+      case 'approved':
+        return 'bg-green-100 text-green-800 border border-green-200';
+      case 'declined':
+        return 'bg-red-100 text-red-800 border border-red-200';
+      case 'partial_refund':
+        return 'bg-blue-100 text-blue-800 border border-blue-200';
+      case 'open':
+        return 'bg-amber-100 text-amber-800 border border-amber-200';
+      case 'resolved':
+      default:
+        return 'bg-gray-100 text-gray-800 border border-gray-200';
+    }
+  };
 
   if (!ready || order === undefined) return <div className="p-4">Loading…</div>;
   if (!allowed) return notFound();
@@ -120,20 +264,90 @@ export default function OrderDetailsPage() {
           </div>
         )}
         <Dialog open={disputeOpen} onOpenChange={setDisputeOpen}>
-          <DialogContent>
+          <DialogContent className="max-w-md">
             <DialogHeader>
               <DialogTitle>Raise Dispute</DialogTitle>
             </DialogHeader>
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Reason</label>
-              <Textarea
-                value={disputeReason}
-                onChange={(e) => setDisputeReason(e.target.value)}
-                placeholder="Describe the issue"
-              />
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="dispute-reason" className="text-sm font-medium">Reason</Label>
+                <Textarea
+                  id="dispute-reason"
+                  value={disputeReason}
+                  onChange={(e) => setDisputeReason(e.target.value)}
+                  placeholder="Describe the issue"
+                  rows={4}
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="dispute-files" className="text-sm font-medium">Attachments (Optional)</Label>
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <Input
+                      id="dispute-files"
+                      type="file"
+                      multiple
+                      onChange={handleFileSelect}
+                      className="hidden"
+                      accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.gif,.txt"
+                    />
+                    <Label
+                      htmlFor="dispute-files"
+                      className="flex items-center gap-2 px-3 py-2 border border-dashed border-gray-300 rounded-md cursor-pointer hover:bg-gray-50 transition-colors"
+                    >
+                      <Upload className="h-4 w-4" />
+                      <span className="text-sm">Choose files</span>
+                    </Label>
+                  </div>
+                  
+                  {disputeFiles.length > 0 && (
+                    <div className="space-y-2">
+                      <div className="text-xs text-muted-foreground">
+                        Selected files ({disputeFiles.length}):
+                      </div>
+                      <div className="space-y-1 max-h-32 overflow-y-auto">
+                        {disputeFiles.map((file, index) => (
+                          <div
+                            key={index}
+                            className="flex items-center justify-between p-2 bg-gray-50 rounded-md text-sm"
+                          >
+                            <div className="flex items-center gap-2 min-w-0 flex-1">
+                              <File className="h-4 w-4 text-gray-500 flex-shrink-0" />
+                              <div className="min-w-0 flex-1">
+                                <div className="truncate font-medium">{file.name}</div>
+                                <div className="text-xs text-muted-foreground">
+                                  {formatFileSize(file.size)}
+                                </div>
+                              </div>
+                            </div>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => removeFile(index)}
+                              className="h-6 w-6 p-0 text-gray-500 hover:text-red-500"
+                            >
+                              <X className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
+            
             <DialogFooter>
-              <Button variant="outline" onClick={() => setDisputeOpen(false)}>
+              <Button 
+                variant="outline" 
+                onClick={() => {
+                  setDisputeOpen(false);
+                  setDisputeReason("");
+                  setDisputeFiles([]);
+                }}
+              >
                 Cancel
               </Button>
               <Button
@@ -146,6 +360,7 @@ export default function OrderDetailsPage() {
                   });
                   setDisputeOpen(false);
                   setDisputeReason("");
+                  setDisputeFiles([]);
                   router.refresh();
                 }}
               >
@@ -154,6 +369,92 @@ export default function OrderDetailsPage() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+        
+        {/* Dispute Action Dialog */}
+        <Dialog open={disputeActionOpen} onOpenChange={setDisputeActionOpen}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>{getActionTitle()}</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              {selectedDispute && (
+                <div className="p-3 bg-muted/30 rounded-lg space-y-2">
+                  <div className="text-sm">
+                    <span className="font-medium">Dispute Reason:</span>
+                    <p className="text-muted-foreground mt-1">{selectedDispute.reason}</p>
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    Raised by: {disputeUserLabels?.[selectedDispute.raisedByUserId]?.name ?? 
+                      disputeUserLabels?.[selectedDispute.raisedByUserId]?.email ?? "User"}
+                    {disputeRoles?.[selectedDispute.raisedByUserId] && 
+                      ` (${disputeRoles[selectedDispute.raisedByUserId]})`}
+                  </div>
+                </div>
+              )}
+              
+              <div className="text-sm text-muted-foreground">
+                {getActionDescription()}
+              </div>
+              
+              {activeAction === 'partial' && (
+                <div className="space-y-2">
+                  <Label htmlFor="adjustment-amount" className="text-sm font-medium">
+                    Adjustment Amount (USD) *
+                  </Label>
+                  <Input
+                    id="adjustment-amount"
+                    type="number"
+                    step="0.01"
+                    min="0.01"
+                    value={adjustmentAmount}
+                    onChange={(e) => setAdjustmentAmount(e.target.value)}
+                    placeholder="0.00"
+                  />
+                </div>
+              )}
+              
+              <div className="space-y-2">
+                <Label htmlFor="resolution-notes" className="text-sm font-medium">
+                  Resolution Notes {activeAction === 'decline' ? '*' : '(Optional)'}
+                </Label>
+                <Textarea
+                  id="resolution-notes"
+                  value={resolutionNotes}
+                  onChange={(e) => setResolutionNotes(e.target.value)}
+                  placeholder={
+                    activeAction === 'decline' 
+                      ? "Please explain why this dispute is being declined..."
+                      : "Add any additional notes about the resolution..."
+                  }
+                  rows={3}
+                />
+              </div>
+            </div>
+            
+            <DialogFooter>
+              <Button 
+                variant="outline" 
+                onClick={() => {
+                  setDisputeActionOpen(false);
+                  setSelectedDispute(null);
+                  setActiveAction(null);
+                  setResolutionNotes("");
+                  setAdjustmentAmount("");
+                }}
+                disabled={submitting}
+              >
+                Cancel
+              </Button>
+              <Button
+                disabled={!isActionValid() || submitting}
+                onClick={submitDisputeAction}
+              >
+                {submitting ? "Processing..." : "Confirm"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+        
         {/* Details + Chat */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
           <Card className="order-1 lg:col-span-1">
@@ -243,15 +544,19 @@ export default function OrderDetailsPage() {
                     <h3 className="font-medium text-sm">Disputes</h3>
                     <div className="space-y-2">
                       {disputes.map((d: any) => (
-                        <div key={d._id} className="rounded border p-2 text-sm">
+                        <div key={d._id} className="rounded border p-3 text-sm space-y-3">
                           <div className="flex items-center justify-between">
-                            <span className="font-medium">{d.status}</span>
+                            <span className="font-medium">
+                              <Badge className={`${getDisputeBadgeClass(d.status)} px-2 py-0.5 text-xs font-medium`}> 
+                                {getDisputeDecisionLabel(d.status)}
+                              </Badge>
+                            </span>
                             <span className="text-xs text-muted-foreground">
                               {new Date(d.createdAt).toLocaleString()}
                             </span>
                           </div>
-                          <div className="mt-1">Reason: {d.reason}</div>
-                          <div className="mt-1 text-xs text-muted-foreground">
+                          <div>Reason: {d.reason}</div>
+                          <div className="text-xs text-muted-foreground">
                             Raised by:{" "}
                             {disputeUserLabels?.[d.raisedByUserId]?.name ??
                               disputeUserLabels?.[d.raisedByUserId]?.email ??
@@ -259,14 +564,71 @@ export default function OrderDetailsPage() {
                             {disputeRoles?.[d.raisedByUserId] &&
                               ` (${disputeRoles[d.raisedByUserId]})`}
                           </div>
-                          {d.adjustmentAmountUsd && (
-                            <div className="mt-1">
-                              Adjustment: ${d.adjustmentAmountUsd}
+                          {typeof d.adjustmentAmountUsd === 'number' && d.status === 'partial_refund' && (
+                            <div>
+                              <span className="text-muted-foreground">Adjustment Amount:</span>{' '}
+                              <span className="font-medium">${d.adjustmentAmountUsd}</span>
                             </div>
                           )}
                           {d.resolutionNotes && (
-                            <div className="mt-1">
+                            <div>
                               Notes: {d.resolutionNotes}
+                            </div>
+                          )}
+                          
+                          {/* Owner Action Dropdown */}
+                          {isOwner && d.status === "open" && (
+                            <div className="pt-3 border-t border-border/50">
+                              <div className="text-xs font-medium text-muted-foreground mb-2">
+                                Owner Actions:
+                              </div>
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="text-xs h-8 px-3"
+                                  >
+                                    Take Action
+                                    <ChevronDown className="h-3 w-3 ml-1" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="start" className="w-48">
+                                  <DropdownMenuItem
+                                    onClick={() => handleDisputeAction(d, 'fix')}
+                                    className="text-green-700 focus:text-green-700 focus:bg-green-50"
+                                  >
+                                    <div className="flex flex-col">
+                                      <span className="font-medium">Fix & Complete</span>
+                                      <span className="text-xs text-muted-foreground">
+                                        Resolve with no adjustment
+                                      </span>
+                                    </div>
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem
+                                    onClick={() => handleDisputeAction(d, 'decline')}
+                                    className="text-red-700 focus:text-red-700 focus:bg-red-50"
+                                  >
+                                    <div className="flex flex-col">
+                                      <span className="font-medium">Decline & Complete</span>
+                                      <span className="text-xs text-muted-foreground">
+                                        Decline the dispute
+                                      </span>
+                                    </div>
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem
+                                    onClick={() => handleDisputeAction(d, 'partial')}
+                                    className="text-blue-700 focus:text-blue-700 focus:bg-blue-50"
+                                  >
+                                    <div className="flex flex-col">
+                                      <span className="font-medium">Partial Refund/Credit</span>
+                                      <span className="text-xs text-muted-foreground">
+                                        Provide monetary adjustment
+                                      </span>
+                                    </div>
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
                             </div>
                           )}
                         </div>
@@ -292,6 +654,8 @@ export default function OrderDetailsPage() {
                 orderId={orderId}
                 canWrite={canWriteToChat}
                 canReadOnly={!canWriteToChat}
+                hasDisputes={disputes && disputes.length > 0}
+                disputeCount={disputes?.length || 0}
               />
             )}
           </div>

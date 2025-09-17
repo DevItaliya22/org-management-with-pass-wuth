@@ -1315,3 +1315,192 @@ export const getOrderAccessInfo = query({
     };
   },
 });
+
+export const fixAndCompleteDispute = mutation({
+  args: {
+    disputeId: v.id("disputes"),
+    resolutionNotes: v.optional(v.string()),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const { userId, user } = await requireViewer(ctx);
+    if (user.role !== "owner") throw new Error("Not authorized");
+
+    const dispute = await ctx.db.get(args.disputeId);
+    if (!dispute) throw new Error("Dispute not found");
+    if (dispute.status !== "open") throw new Error("Dispute is not open");
+
+    const now = Date.now();
+    
+    // Update dispute status to approved (fixed & completed)
+    await ctx.db.patch(args.disputeId, {
+      status: "approved",
+      resolutionNotes: args.resolutionNotes,
+      resolvedByUserId: userId,
+      resolvedAt: now,
+    });
+
+    // Check if there are any other open disputes for this order
+    const otherOpenDisputes = await ctx.db
+      .query("disputes")
+      .withIndex("by_order", (q) => q.eq("orderId", dispute.orderId))
+      .filter((q) => q.eq(q.field("status"), "open"))
+      .collect();
+
+    // If no other open disputes, update order status back to completed
+    if (otherOpenDisputes.length === 0) {
+      await ctx.db.patch(dispute.orderId, { 
+        status: "completed", 
+        updatedAt: now 
+      });
+    }
+
+    // Log the action
+    await ctx.db.insert("auditLogs", {
+      actorUserId: userId,
+      entity: "dispute",
+      entityId: String(args.disputeId),
+      action: "dispute_fixed_and_completed",
+      metadata: { 
+        orderId: dispute.orderId,
+        resolutionNotes: args.resolutionNotes 
+      },
+      orderId: dispute.orderId,
+      createdAt: now,
+    });
+
+    return null;
+  },
+});
+
+export const declineAndCompleteDispute = mutation({
+  args: {
+    disputeId: v.id("disputes"),
+    resolutionNotes: v.string(),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const { userId, user } = await requireViewer(ctx);
+    if (user.role !== "owner") throw new Error("Not authorized");
+
+    const dispute = await ctx.db.get(args.disputeId);
+    if (!dispute) throw new Error("Dispute not found");
+    if (dispute.status !== "open") throw new Error("Dispute is not open");
+
+    const now = Date.now();
+    
+    // Update dispute status to declined & completed
+    await ctx.db.patch(args.disputeId, {
+      status: "declined",
+      resolutionNotes: args.resolutionNotes,
+      resolvedByUserId: userId,
+      resolvedAt: now,
+    });
+
+    // Check if there are any other open disputes for this order
+    const otherOpenDisputes = await ctx.db
+      .query("disputes")
+      .withIndex("by_order", (q) => q.eq("orderId", dispute.orderId))
+      .filter((q) => q.eq(q.field("status"), "open"))
+      .collect();
+
+    // If no other open disputes, update order status back to completed
+    if (otherOpenDisputes.length === 0) {
+      await ctx.db.patch(dispute.orderId, { 
+        status: "completed", 
+        updatedAt: now 
+      });
+    }
+
+    // Log the action
+    await ctx.db.insert("auditLogs", {
+      actorUserId: userId,
+      entity: "dispute",
+      entityId: String(args.disputeId),
+      action: "dispute_declined_and_completed",
+      metadata: { 
+        orderId: dispute.orderId,
+        resolutionNotes: args.resolutionNotes 
+      },
+      orderId: dispute.orderId,
+      createdAt: now,
+    });
+
+    return null;
+  },
+});
+
+export const partialRefundAndCompleteDispute = mutation({
+  args: {
+    disputeId: v.id("disputes"),
+    adjustmentAmountUsd: v.number(),
+    resolutionNotes: v.optional(v.string()),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const { userId, user } = await requireViewer(ctx);
+    if (user.role !== "owner") throw new Error("Not authorized");
+    if (args.adjustmentAmountUsd <= 0) throw new Error("Adjustment amount must be positive");
+
+    const dispute = await ctx.db.get(args.disputeId);
+    if (!dispute) throw new Error("Dispute not found");
+    if (dispute.status !== "open") throw new Error("Dispute is not open");
+
+    const now = Date.now();
+    
+    // Update dispute status to partial_refund with adjustment
+    await ctx.db.patch(args.disputeId, {
+      status: "partial_refund",
+      adjustmentAmountUsd: args.adjustmentAmountUsd,
+      resolutionNotes: args.resolutionNotes,
+      resolvedByUserId: userId,
+      resolvedAt: now,
+    });
+
+    // Get the order to access team information
+    const order = await ctx.db.get(dispute.orderId);
+    if (!order) throw new Error("Order not found");
+
+    // TODO: Implement balance adjustment when balance system is added
+    // Adjust reseller balance (negative adjustment = credit to reseller)
+    // const team = await ctx.db.get(order.teamId);
+    // if (team) {
+    //   await ctx.db.patch(order.teamId, {
+    //     balanceUsd: (team.balanceUsd || 0) - args.adjustmentAmountUsd,
+    //     updatedAt: now,
+    //   });
+    // }
+
+    // Check if there are any other open disputes for this order
+    const otherOpenDisputes = await ctx.db
+      .query("disputes")
+      .withIndex("by_order", (q) => q.eq("orderId", dispute.orderId))
+      .filter((q) => q.eq(q.field("status"), "open"))
+      .collect();
+
+    // If no other open disputes, update order status back to completed
+    if (otherOpenDisputes.length === 0) {
+      await ctx.db.patch(dispute.orderId, { 
+        status: "completed", 
+        updatedAt: now 
+      });
+    }
+
+    // Log the action
+    await ctx.db.insert("auditLogs", {
+      actorUserId: userId,
+      entity: "dispute",
+      entityId: String(args.disputeId),
+      action: "dispute_partial_refund_and_completed",
+      metadata: { 
+        orderId: dispute.orderId,
+        adjustmentAmountUsd: args.adjustmentAmountUsd,
+        resolutionNotes: args.resolutionNotes 
+      },
+      orderId: dispute.orderId,
+      createdAt: now,
+    });
+
+    return null;
+  },
+});

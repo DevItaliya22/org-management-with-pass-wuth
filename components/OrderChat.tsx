@@ -14,12 +14,16 @@ type OrderChatProps = {
   orderId: string;
   canWrite: boolean;
   canReadOnly: boolean;
+  hasDisputes?: boolean;
+  disputeCount?: number;
 };
 
 export default function OrderChat({
   orderId,
   canWrite,
   canReadOnly,
+  hasDisputes = false,
+  disputeCount = 0,
 }: OrderChatProps) {
   const [message, setMessage] = useState("");
   const [files, setFiles] = useState<Array<File>>([]);
@@ -105,6 +109,22 @@ export default function OrderChat({
         <CardTitle>Chat</CardTitle>
       </CardHeader>
       <CardContent className="flex-1 flex flex-col gap-3">
+        {hasDisputes && (
+          <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-2">
+            <div className="flex items-center gap-2">
+              <div className="w-2 h-2 bg-amber-500 rounded-full"></div>
+              <div className="text-sm font-medium text-amber-800">
+                Dispute Communication
+              </div>
+            </div>
+            <div className="text-xs text-amber-700 mt-1">
+              {disputeCount === 1 
+                ? "A dispute has been raised for this order. All further communication regarding this dispute should be handled here."
+                : `${disputeCount} disputes have been raised for this order. All further communication regarding these disputes should be handled here.`
+              }
+            </div>
+          </div>
+        )}
         <ScrollArea className="max-h-[60vh] rounded border p-2 bg-card overflow-y-auto">
           <div className="space-y-3 text-sm">
             {displayMessages.length === 0 ? (
