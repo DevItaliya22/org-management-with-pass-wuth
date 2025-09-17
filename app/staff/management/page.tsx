@@ -149,7 +149,17 @@ export default function StaffManagementPage() {
               Manage your staff members and their accounts.
             </p>
           </div>
-          <Dialog open={isCreateModalOpen} onOpenChange={setIsCreateModalOpen}>
+          <Dialog
+            open={isCreateModalOpen}
+            onOpenChange={(open) => {
+              setIsCreateModalOpen(open);
+              if (open) {
+                setCreateStatus(null);
+                setEmail("");
+                setPassword("");
+              }
+            }}
+          >
             <DialogTrigger asChild>
               <div className="min-w-[220px]">
                 <GradientButton>
