@@ -66,7 +66,7 @@ export function RoleInfo() {
   const { user, resellerMember, team } = sessionData;
   const userRole = user.role;
   const memberRole = resellerMember?.role;
-  const memberStatus = resellerMember?.status;
+  const memberActive = resellerMember?.isActive && !resellerMember?.isBlocked;
 
   // Get the appropriate icon and color for the primary role
   const getPrimaryRoleInfo = () => {
@@ -138,16 +138,18 @@ export function RoleInfo() {
                 <Badge
                   variant="outline"
                   className={`text-xs ${
-                    memberStatus === "active_member"
+                    memberActive
                       ? "bg-green-100 text-green-800 border-green-200"
-                      : memberStatus === "default_member"
-                        ? "bg-blue-100 text-blue-800 border-blue-200"
-                        : memberStatus === "pending_invitation"
-                          ? "bg-yellow-100 text-yellow-800 border-yellow-200"
-                          : "bg-red-100 text-red-800 border-red-200"
+                      : resellerMember?.isBlocked
+                        ? "bg-red-100 text-red-800 border-red-200"
+                        : "bg-yellow-100 text-yellow-800 border-yellow-200"
                   }`}
                 >
-                  {memberStatus?.replace("_", " ")}
+                  {memberActive
+                    ? "Active"
+                    : resellerMember?.isBlocked
+                      ? "Blocked"
+                      : "Inactive"}
                 </Badge>
               </div>
 

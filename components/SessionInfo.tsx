@@ -84,16 +84,18 @@ export function SessionInfo() {
               <strong>Status:</strong>
               <span
                 className={`ml-1 px-2 py-1 rounded text-xs ${
-                  resellerMember.status === "active_member"
+                  resellerMember.isActive && !resellerMember.isBlocked
                     ? "bg-green-200 text-green-800"
-                    : resellerMember.status === "default_member"
-                      ? "bg-blue-200 text-blue-800"
-                      : resellerMember.status === "pending_invitation"
-                        ? "bg-yellow-200 text-yellow-800"
-                        : "bg-red-200 text-red-800"
+                    : resellerMember.isBlocked
+                      ? "bg-red-200 text-red-800"
+                      : "bg-yellow-200 text-yellow-800"
                 }`}
               >
-                {resellerMember.status}
+                {resellerMember.isActive && !resellerMember.isBlocked
+                  ? "Active"
+                  : resellerMember.isBlocked
+                    ? "Blocked"
+                    : "Inactive"}
               </span>
             </div>
             <div>

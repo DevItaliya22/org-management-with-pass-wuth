@@ -20,40 +20,63 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
+import DashboardLayout from "@/components/Dashboard/DashboardLayout";
+import OwnerPermissions from "./OwnerPermissions";
+import ResellerAdminPermissions from "./ResellerAdminPermissions";
+import ResellerMemberPermissions from "./ResellerMemberPermissions";
+import StaffPermissions from "./StaffPermissions";
 
 export default function OrderDetailsPage() {
-  const { isLoading, isReseller, isOwner } = useRole();
+  const {
+    isLoading,
+    isReseller,
+    isOwner,
+    isResellerAdmin,
+    isResellerMember,
+    isStaff,
+  } = useRole();
   const [ready, setReady] = useState(false);
   const [allowed, setAllowed] = useState<boolean | null>(null);
 
   useEffect(() => {
     if (!isLoading) {
       setReady(true);
-      setAllowed(!!(isReseller || isOwner));
+      setAllowed(!!(isReseller || isOwner || isStaff));
     }
-  }, [isLoading, isReseller, isOwner]);
+  }, [isLoading, isReseller, isOwner, isStaff]);
 
   const params = useParams();
   const orderId = params?.orderId as string | undefined;
   const router = useRouter();
 
-  const order = useQuery(api.orders.getOrderById, orderId ? { orderId } as any : "skip");
-  const disputes = useQuery(api.orders.getDisputesByOrder, orderId ? { orderId } as any : "skip");
+  const order = useQuery(
+    api.orders.getOrderById,
+    orderId ? ({ orderId } as any) : "skip",
+  );
+  const disputes = useQuery(
+    api.orders.getDisputesByOrder,
+    orderId ? ({ orderId } as any) : "skip",
+  );
   const disputeUserIds: string[] =
     disputes && disputes.length > 0
       ? Array.from(new Set(disputes.map((d: any) => d.raisedByUserId)))
       : [];
   const disputeUserLabels = useQuery(
     api.orders.getUserLabels,
-    disputeUserIds.length ? ({ userIds: disputeUserIds } as any) : ("skip" as any)
+    disputeUserIds.length
+      ? ({ userIds: disputeUserIds } as any)
+      : ("skip" as any),
   );
   const disputeRoles = useQuery(
     api.orders.getUserTeamRoles,
-    order && disputeUserIds.length ? ({ teamId: order.teamId, userIds: disputeUserIds } as any) : ("skip" as any)
+    order && disputeUserIds.length
+      ? ({ teamId: order.teamId, userIds: disputeUserIds } as any)
+      : ("skip" as any),
   );
- 
+
   const completeOrder = useMutation(api.orders.completeOrder);
   const raiseDispute = useMutation(api.orders.raiseDispute);
+
   const [completing, setCompleting] = useState(false);
   const [disputeOpen, setDisputeOpen] = useState(false);
   const [disputeReason, setDisputeReason] = useState("");
@@ -64,13 +87,10 @@ export default function OrderDetailsPage() {
     return <div className="p-4">Order not found or not authorized</div>;
 
   return (
-    <div className="p-4 grid grid-cols-1 lg:grid-cols-2 gap-4">
-      <div className="lg:col-span-3 mb-2">
-        <Button variant="outline" size="sm" onClick={() => router.back()}>
-          Back
-        </Button>
+    <DashboardLayout>
+      <div className="space-y-4">
         {isReseller && order.status === "fulfil_submitted" && (
-          <div className="mt-3 flex items-center gap-2">
+          <div className="flex items-center gap-2">
             <Button
               size="sm"
               disabled={completing}
@@ -95,158 +115,207 @@ export default function OrderDetailsPage() {
             </Button>
           </div>
         )}
-      </div>
-      <Dialog open={disputeOpen} onOpenChange={setDisputeOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Raise Dispute</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Reason</label>
-            <Textarea
-              value={disputeReason}
-              onChange={(e) => setDisputeReason(e.target.value)}
-              placeholder="Describe the issue"
-            />
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setDisputeOpen(false)}>
-              Cancel
-            </Button>
-            <Button
-              disabled={!disputeReason.trim()}
-              onClick={async () => {
-                if (!disputeReason.trim()) return;
-                await raiseDispute({
-                  orderId: order._id,
-                  reason: disputeReason.trim(),
-                });
-                setDisputeOpen(false);
-                setDisputeReason("");
-                router.refresh();
-              }}
-            >
-              Submit Dispute
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-      {/* Left: Details */}
-      <div className="space-y-4">
-        <Card>
-          <CardHeader>
-            <CardTitle>Order #{order._id}</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <section className="space-y-2">
-              <h3 className="font-medium text-sm">Customer</h3>
-              <div className="grid grid-cols-3 gap-2 text-sm">
-                <span className="text-muted-foreground">Name</span>
-                <span className="col-span-2 font-medium">{order.customerName}</span>
-                <span className="text-muted-foreground">Location</span>
-                <span className="col-span-2">{order.country}, {order.city}</span>
-                {order.contact && (
-                  <>
-                    <span className="text-muted-foreground">Contact</span>
-                    <span className="col-span-2 break-all">{order.contact}</span>
-                  </>
-                )}
-              </div>
-            </section>
-            <Separator />
-            <section className="space-y-2">
-              <h3 className="font-medium text-sm">Order</h3>
-              <div className="grid grid-cols-3 gap-2 text-sm">
-                <span className="text-muted-foreground">Merchant</span>
-                <span className="col-span-2 font-medium break-all">{order.merchant}</span>
-                <span className="text-muted-foreground">Cart Value</span>
-                <span className="col-span-2 font-medium">${order.cartValueUsd}</span>
-                <span className="text-muted-foreground">SLA</span>
-                <span className="col-span-2">{order.sla}</span>
-                <span className="text-muted-foreground">Status</span>
-                <span className="col-span-2 font-medium">{order.status}</span>
-                {order.status === "on_hold" && order.holdReason && (
-                  <>
-                    <span className="text-muted-foreground">Hold Reason</span>
-                    <span className="col-span-2 break-words">{order.holdReason}</span>
-                  </>
-                )}
-              </div>
-            </section>
-            {order.fulfilment && (
-              <>
-                <Separator />
-                <section className="space-y-2">
-                  <h3 className="font-medium text-sm">Fulfilment</h3>
-                  <div className="grid grid-cols-3 gap-2 text-sm">
-                    <span className="text-muted-foreground">Merchant Link</span>
-                    <span className="col-span-2 break-all">{order.fulfilment.merchantLink}</span>
-                    <span className="text-muted-foreground">Name on Order</span>
-                    <span className="col-span-2">{order.fulfilment.nameOnOrder}</span>
-                    <span className="text-muted-foreground">Final Value (USD)</span>
-                    <span className="col-span-2 font-medium">${order.fulfilment.finalValueUsd}</span>
-                  </div>
-                </section>
-              </>
-            )}
-            {(isOwner || isReseller) && disputes && disputes.length > 0 && (
-              <>
-                <Separator />
-                <section className="space-y-2">
-                  <h3 className="font-medium text-sm">Disputes</h3>
-                  <div className="space-y-2">
-                    {disputes.map((d: any) => (
-                      <div key={d._id} className="rounded border p-2 text-sm">
-                        <div className="flex items-center justify-between">
-                          <span className="font-medium">{d.status}</span>
-                          <span className="text-xs text-muted-foreground">{new Date(d.createdAt).toLocaleString()}</span>
+        <Dialog open={disputeOpen} onOpenChange={setDisputeOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Raise Dispute</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Reason</label>
+              <Textarea
+                value={disputeReason}
+                onChange={(e) => setDisputeReason(e.target.value)}
+                placeholder="Describe the issue"
+              />
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setDisputeOpen(false)}>
+                Cancel
+              </Button>
+              <Button
+                disabled={!disputeReason.trim()}
+                onClick={async () => {
+                  if (!disputeReason.trim()) return;
+                  await raiseDispute({
+                    orderId: order._id,
+                    reason: disputeReason.trim(),
+                  });
+                  setDisputeOpen(false);
+                  setDisputeReason("");
+                  router.refresh();
+                }}
+              >
+                Submit Dispute
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+        {/* Details + Chat */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          <Card className="order-1 lg:col-span-1">
+            <CardHeader>
+              <CardTitle>Order from {order.merchant}</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <section className="space-y-2">
+                <h3 className="font-medium text-sm">Customer</h3>
+                <div className="grid grid-cols-3 gap-2 text-sm">
+                  <span className="text-muted-foreground">Name</span>
+                  <span className="col-span-2 font-medium">
+                    {order.customerName}
+                  </span>
+                  <span className="text-muted-foreground">Location</span>
+                  <span className="col-span-2">
+                    {order.country}, {order.city}
+                  </span>
+                  {order.contact && (
+                    <>
+                      <span className="text-muted-foreground">Contact</span>
+                      <span className="col-span-2 break-all">
+                        {order.contact}
+                      </span>
+                    </>
+                  )}
+                </div>
+              </section>
+              <Separator />
+              <section className="space-y-2">
+                <h3 className="font-medium text-sm">Order</h3>
+                <div className="grid grid-cols-3 gap-2 text-sm">
+                  <span className="text-muted-foreground">Merchant</span>
+                  <span className="col-span-2 font-medium break-all">
+                    {order.merchant}
+                  </span>
+                  <span className="text-muted-foreground">Cart Value</span>
+                  <span className="col-span-2 font-medium">
+                    ${order.cartValueUsd}
+                  </span>
+                  <span className="text-muted-foreground">SLA</span>
+                  <span className="col-span-2">{order.sla}</span>
+                  <span className="text-muted-foreground">Status</span>
+                  <span className="col-span-2 font-medium">{order.status}</span>
+                  {order.status === "on_hold" && order.holdReason && (
+                    <>
+                      <span className="text-muted-foreground">Hold Reason</span>
+                      <span className="col-span-2 break-words">
+                        {order.holdReason}
+                      </span>
+                    </>
+                  )}
+                </div>
+              </section>
+              {order.fulfilment && (
+                <>
+                  <Separator />
+                  <section className="space-y-2">
+                    <h3 className="font-medium text-sm">Fulfilment</h3>
+                    <div className="grid grid-cols-3 gap-2 text-sm">
+                      <span className="text-muted-foreground">
+                        Merchant Link
+                      </span>
+                      <span className="col-span-2 break-all">
+                        {order.fulfilment.merchantLink}
+                      </span>
+                      <span className="text-muted-foreground">
+                        Name on Order
+                      </span>
+                      <span className="col-span-2">
+                        {order.fulfilment.nameOnOrder}
+                      </span>
+                      <span className="text-muted-foreground">
+                        Final Value (USD)
+                      </span>
+                      <span className="col-span-2 font-medium">
+                        ${order.fulfilment.finalValueUsd}
+                      </span>
+                    </div>
+                  </section>
+                </>
+              )}
+              {(isOwner || isReseller) && disputes && disputes.length > 0 && (
+                <>
+                  <Separator />
+                  <section className="space-y-2">
+                    <h3 className="font-medium text-sm">Disputes</h3>
+                    <div className="space-y-2">
+                      {disputes.map((d: any) => (
+                        <div key={d._id} className="rounded border p-2 text-sm">
+                          <div className="flex items-center justify-between">
+                            <span className="font-medium">{d.status}</span>
+                            <span className="text-xs text-muted-foreground">
+                              {new Date(d.createdAt).toLocaleString()}
+                            </span>
+                          </div>
+                          <div className="mt-1">Reason: {d.reason}</div>
+                          <div className="mt-1 text-xs text-muted-foreground">
+                            Raised by:{" "}
+                            {disputeUserLabels?.[d.raisedByUserId]?.name ??
+                              disputeUserLabels?.[d.raisedByUserId]?.email ??
+                              "User"}
+                            {disputeRoles?.[d.raisedByUserId] &&
+                              ` (${disputeRoles[d.raisedByUserId]})`}
+                          </div>
+                          {d.adjustmentAmountUsd && (
+                            <div className="mt-1">
+                              Adjustment: ${d.adjustmentAmountUsd}
+                            </div>
+                          )}
+                          {d.resolutionNotes && (
+                            <div className="mt-1">
+                              Notes: {d.resolutionNotes}
+                            </div>
+                          )}
                         </div>
-                        <div className="mt-1">Reason: {d.reason}</div>
-                        <div className="mt-1 text-xs text-muted-foreground">
-                          Raised by: {disputeUserLabels?.[d.raisedByUserId]?.name ?? disputeUserLabels?.[d.raisedByUserId]?.email ?? "User"}
-                          {disputeRoles?.[d.raisedByUserId] && ` (${disputeRoles[d.raisedByUserId]})`}
-                        </div>
-                        {d.adjustmentAmountUsd && (
-                          <div className="mt-1">Adjustment: ${d.adjustmentAmountUsd}</div>
-                        )}
-                        {d.resolutionNotes && (
-                          <div className="mt-1">Notes: {d.resolutionNotes}</div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </section>
-              </>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+                      ))}
+                    </div>
+                  </section>
+                </>
+              )}
 
-      {/* Right: Temporary Chat */}
-      <div>
-        <Card className="h-full flex flex-col">
-          <CardHeader>
-            <CardTitle>Chat (temporary)</CardTitle>
-          </CardHeader>
-          <CardContent className="flex-1 flex flex-col gap-3">
-            <ScrollArea className="flex-1 h-[55vh] rounded border p-2 bg-card">
-              <div className="space-y-2 text-sm">
-                <div>
-                  <span className="font-medium">You:</span> Hello, please
-                  confirm details.
-                </div>
-                <div>
-                  <span className="font-medium">Staff:</span> Working on it.
-                </div>
-              </div>
-            </ScrollArea>
-            <form className="flex gap-2">
-              <Input placeholder="Type a message…" />
-              <Button type="button">Send</Button>
-            </form>
-          </CardContent>
-        </Card>
+              {/* Conditional Permission Components Based on Role */}
+              {isOwner && orderId && (
+                <OwnerPermissions orderId={orderId} order={order} />
+              )}
+              {isResellerAdmin && orderId && (
+                <ResellerAdminPermissions orderId={orderId} order={order} />
+              )}
+              {isResellerMember && orderId && (
+                <ResellerMemberPermissions orderId={orderId} order={order} />
+              )}
+              {isStaff && orderId && (
+                <StaffPermissions orderId={orderId} order={order} />
+              )}
+            </CardContent>
+          </Card>
+          {/* Chat (UI only, disabled) */}
+          <div className="order-2 lg:col-span-2">
+            <Card className="h-full flex flex-col">
+              <CardHeader>
+                <CardTitle>Chat</CardTitle>
+              </CardHeader>
+              <CardContent className="flex-1 flex flex-col gap-3">
+                <ScrollArea className="flex-1 h-[55vh] rounded border p-2 bg-card">
+                  <div className="space-y-2 text-sm">
+                    <div>
+                      <span className="font-medium">You:</span> Hello, please
+                      confirm details.
+                    </div>
+                    <div>
+                      <span className="font-medium">Staff:</span> Working on it.
+                    </div>
+                  </div>
+                </ScrollArea>
+                <form className="flex gap-2">
+                  <Input placeholder="Type a message…" disabled />
+                  <Button type="button" disabled>
+                    Send
+                  </Button>
+                </form>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
       </div>
-    </div>
+    </DashboardLayout>
   );
 }

@@ -204,14 +204,18 @@ export default function TeamManagementPage() {
                       <TableCell>
                         <Badge
                           variant={
-                            member.status === "active_member"
+                            member.isActive && !member.isBlocked
                               ? "default"
-                              : member.status === "suspended_member"
+                              : member.isBlocked
                                 ? "destructive"
                                 : "secondary"
                           }
                         >
-                          {member.status.replace("_", " ")}
+                          {member.isBlocked
+                            ? "blocked"
+                            : member.isActive
+                              ? "active"
+                              : "inactive"}
                         </Badge>
                       </TableCell>
                       <TableCell>

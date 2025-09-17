@@ -131,7 +131,7 @@ export const reviewPromotionRequest = mutation({
 
       await ctx.db.patch(member._id, {
         role: "admin",
-        status: "active_member",
+        isActive: true,
         approvedByUserId: reviewerUserId,
         approvedAt: now,
         updatedAt: now,
@@ -307,7 +307,12 @@ export const inviteToTeam = mutation({
       .withIndex("by_user", (q) => q.eq("userId", inviterId))
       .filter((q) => q.eq(q.field("teamId"), args.teamId))
       .first();
-    if (!membership || membership.role !== "admin") {
+    if (
+      !membership ||
+      membership.role !== "admin" ||
+      !membership.isActive ||
+      membership.isBlocked
+    ) {
       throw new Error("Only admins can invite");
     }
 
@@ -490,7 +495,7 @@ export const acceptInvitation = mutation({
     if (invitedMembership) {
       await ctx.db.patch(invitedMembership._id, {
         isActive: true,
-        status: "active_member",
+        isBlocked: false,
         updatedAt: now,
       });
     } else {
@@ -498,7 +503,7 @@ export const acceptInvitation = mutation({
         teamId: invite.teamId,
         userId,
         role: "member",
-        status: "active_member",
+        status: "default_member",
         isActive: true,
         isBlocked: false,
         createdAt: now,
@@ -545,7 +550,12 @@ export const updateTeam = mutation({
       .withIndex("by_user", (q) => q.eq("userId", userId))
       .filter((q) => q.eq(q.field("teamId"), args.teamId))
       .first();
-    if (!membership || membership.role !== "admin")
+    if (
+      !membership ||
+      membership.role !== "admin" ||
+      !membership.isActive ||
+      membership.isBlocked
+    )
       throw new Error("Only admins can update team");
     const now = Date.now();
     const patch: any = { name: args.name, updatedAt: now };
@@ -567,8 +577,6 @@ export const getTeamMembers = query({
       role: v.union(v.literal("admin"), v.literal("member")),
       status: v.union(
         v.literal("pending_invitation"),
-        v.literal("active_member"),
-        v.literal("suspended_member"),
         v.literal("default_member"),
       ),
       isActive: v.boolean(),
@@ -599,7 +607,12 @@ export const getTeamMembers = query({
       .withIndex("by_user", (q) => q.eq("userId", userId))
       .filter((q) => q.eq(q.field("teamId"), args.teamId))
       .first();
-    if (!membership || membership.role !== "admin") {
+    if (
+      !membership ||
+      membership.role !== "admin" ||
+      !membership.isActive ||
+      membership.isBlocked
+    ) {
       throw new Error("Only team admins can view team members");
     }
 
@@ -654,7 +667,12 @@ export const updateMemberStatus = mutation({
       .withIndex("by_user", (q) => q.eq("userId", userId))
       .filter((q) => q.eq(q.field("teamId"), member.teamId))
       .first();
-    if (!adminMembership || adminMembership.role !== "admin") {
+    if (
+      !adminMembership ||
+      adminMembership.role !== "admin" ||
+      !adminMembership.isActive ||
+      adminMembership.isBlocked
+    ) {
       throw new Error("Only team admins can update member status");
     }
 
@@ -687,8 +705,6 @@ export const getUserDetails = query({
           role: v.union(v.literal("admin"), v.literal("member")),
           status: v.union(
             v.literal("pending_invitation"),
-            v.literal("active_member"),
-            v.literal("suspended_member"),
             v.literal("default_member"),
           ),
           isActive: v.boolean(),
@@ -724,7 +740,12 @@ export const getUserDetails = query({
           .filter((q) => q.eq(q.field("teamId"), resellerMember.teamId))
           .first();
 
-        if (!currentUserMembership || currentUserMembership.role !== "admin") {
+        if (
+          !currentUserMembership ||
+          currentUserMembership.role !== "admin" ||
+          !currentUserMembership.isActive ||
+          currentUserMembership.isBlocked
+        ) {
           throw new Error("You can only view details of users in your team");
         }
       } else {

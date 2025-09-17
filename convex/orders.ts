@@ -41,7 +41,7 @@ export const createOrder = mutation({
       throw new Error("Not authorized to create orders");
     }
 
-    // Verify membership in the team: allow default_member and active_member; block suspended
+    // Verify membership in the team: allow default_member ; block suspended
     const membership = await ctx.db
       .query("resellerMembers")
       .withIndex("by_user", (q: any) => q.eq("userId", userId))
@@ -50,8 +50,8 @@ export const createOrder = mutation({
     if (!membership) {
       throw new Error("No membership for this team");
     }
-    if (membership.status === "suspended_member") {
-      throw new Error("Membership suspended");
+    if (membership.isBlocked) {
+      throw new Error("Membership blocked");
     }
 
     const now = Date.now();
@@ -118,6 +118,15 @@ export const getOrderById = query({
     if (order.createdByUserId === userId) return order;
     if (user.role === "staff" && order.pickedByStaffUserId === userId)
       return order;
+
+    // Check read access permissions
+    if (
+      order.readAccessUserIds.includes(userId) ||
+      order.writeAccessUserIds.includes(userId)
+    ) {
+      return order;
+    }
+
     if (user.role === "reseller") {
       const membership = await ctx.db
         .query("resellerMembers")
@@ -126,7 +135,8 @@ export const getOrderById = query({
         .first();
       if (
         membership &&
-        membership.status === "active_member" &&
+        membership.isActive &&
+        !membership.isBlocked &&
         membership.role === "admin"
       ) {
         return order;
@@ -211,7 +221,7 @@ export const listOrdersForReseller = query({
         .withIndex("by_user", (q: any) => q.eq("userId", userId))
         .filter((q: any) => q.eq(q.field("teamId"), args.teamId))
         .first();
-      if (!membership || membership.status !== "active_member")
+      if (!membership || !membership.isActive || membership.isBlocked)
         throw new Error("Not a member");
       const isAdmin = membership.role === "admin";
       if (!isAdmin) {
@@ -324,7 +334,7 @@ export const listOrdersForViewer = query({
         .first();
 
       // Base sets: own orders and read-access orders
-      const [ownPage, readAccessList,writeAccessList] = await Promise.all([
+      const [ownPage, allOrders] = await Promise.all([
         ctx.db
           .query("orders")
           .withIndex("by_created_by", (q) => q.eq("createdByUserId", userId))
@@ -332,26 +342,26 @@ export const listOrdersForViewer = query({
           .paginate(args.paginationOpts),
         ctx.db
           .query("orders")
-          .withIndex("by_read_access", (q) =>
-            q.eq("readAccessUserIds", [userId]),
-          )
-          .order("desc")
-          .collect(),
-        ctx.db
-          .query("orders")
-          .withIndex("by_write_access", (q) =>
-            q.eq("writeAccessUserIds", [userId]),
-          )
+          .withIndex("by_createdAt", (q) => q.gte("createdAt", 0))
           .order("desc")
           .collect(),
       ]);
 
+      // Filter orders where user has read or write access
+      const readAccessList = allOrders.filter((order) =>
+        order.readAccessUserIds.includes(userId),
+      );
+      const writeAccessList = allOrders.filter((order) =>
+        order.writeAccessUserIds.includes(userId),
+      );
+
       let combined = [...ownPage.page, ...readAccessList, ...writeAccessList];
 
-      // If admin of a team (active_member), include team-wide orders
+      // If admin of a team (active), include team-wide orders
       if (
         membership &&
-        membership.status === "active_member" &&
+        membership.isActive &&
+        !membership.isBlocked &&
         membership.role === "admin"
       ) {
         const teamPage = await ctx.db
@@ -435,7 +445,7 @@ export const getUserTeamRoles = query({
         .withIndex("by_user", (q: any) => q.eq("userId", uid))
         .filter((q: any) => q.eq(q.field("teamId"), args.teamId))
         .first();
-      if (membership && membership.status === "active_member") {
+      if (membership && membership.isActive && !membership.isBlocked) {
         out[uid] = membership.role;
       }
     }
@@ -714,7 +724,8 @@ export const completeOrder = mutation({
         .first();
       if (
         membership &&
-        membership.status === "active_member" &&
+        membership.isActive &&
+        !membership.isBlocked &&
         membership.role === "admin"
       ) {
         canComplete = true;
@@ -759,7 +770,8 @@ export const raiseDispute = mutation({
       .first();
     const isAdmin =
       membership &&
-      membership.status === "active_member" &&
+      membership.isActive &&
+      !membership.isBlocked &&
       membership.role === "admin";
     if (!isAdmin && order.createdByUserId !== userId)
       throw new Error("Not authorized to dispute this order");
@@ -833,5 +845,317 @@ export const getDisputesByOrder = query({
       resolutionNotes: d.resolutionNotes,
       adjustmentAmountUsd: d.adjustmentAmountUsd,
     }));
+  },
+});
+
+// Get team members available for permission assignment (owner and reseller admin)
+export const getTeamMembersForPermissions = query({
+  args: { orderId: v.id("orders") },
+  returns: v.array(
+    v.object({
+      _id: v.id("users"),
+      name: v.optional(v.string()),
+      email: v.string(),
+      role: v.union(v.literal("admin"), v.literal("member")),
+      hasReadAccess: v.boolean(),
+      hasWriteAccess: v.boolean(),
+    }),
+  ),
+  handler: async (ctx, args) => {
+    const { userId, user } = await requireViewer(ctx);
+
+    const order = await ctx.db.get(args.orderId);
+    if (!order) throw new Error("Order not found");
+
+    // Owner can manage any order's permissions
+    if (user.role === "owner") {
+      // Continue to get team members
+    } else if (user.role === "reseller") {
+      // Check if user is admin of the order's team
+      const membership = await ctx.db
+        .query("resellerMembers")
+        .withIndex("by_user", (q: any) => q.eq("userId", userId))
+        .filter((q: any) => q.eq(q.field("teamId"), order.teamId))
+        .first();
+
+      if (!membership) {
+        throw new Error("User is not a member of this team");
+      }
+
+      if (!membership.isActive) {
+        throw new Error("User membership is not active");
+      }
+
+      if (membership.isBlocked) {
+        throw new Error("User is blocked from this team");
+      }
+
+      if (membership.role !== "admin") {
+        throw new Error(
+          `User role is ${membership.role}, must be admin to manage permissions`,
+        );
+      }
+    } else {
+      throw new Error("Not authorized");
+    }
+
+    // Get all active team members (not blocked)
+    const teamMembers = await ctx.db
+      .query("resellerMembers")
+      .withIndex("by_team", (q) => q.eq("teamId", order.teamId))
+      .filter((q: any) =>
+        q.and(
+          q.eq(q.field("isActive"), true),
+          q.eq(q.field("isBlocked"), false),
+        ),
+      )
+      .collect();
+
+    // Get user details and check permissions
+    const result = await Promise.all(
+      teamMembers
+        .filter((member) => member.userId !== userId) // Exclude current admin
+        .map(async (member) => {
+          const memberUser = await ctx.db.get(member.userId);
+          if (!memberUser) return null;
+
+          return {
+            _id: memberUser._id,
+            name: memberUser.name,
+            email: memberUser.email,
+            role: member.role,
+            hasReadAccess: order.readAccessUserIds.includes(memberUser._id),
+            hasWriteAccess: order.writeAccessUserIds.includes(memberUser._id),
+          };
+        }),
+    );
+
+    return result.filter(Boolean) as any;
+  },
+});
+
+// Update read access permissions for an order (owner and reseller admin)
+export const updateOrderReadAccess = mutation({
+  args: {
+    orderId: v.id("orders"),
+    userIds: v.array(v.id("users")),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const { userId, user } = await requireViewer(ctx);
+
+    const order = await ctx.db.get(args.orderId);
+    if (!order) throw new Error("Order not found");
+
+    // Owner can manage any order's permissions
+    if (user.role === "owner") {
+      // Continue to update permissions
+    } else if (user.role === "reseller") {
+      // Check if user is admin of the order's team
+      const membership = await ctx.db
+        .query("resellerMembers")
+        .withIndex("by_user", (q: any) => q.eq("userId", userId))
+        .filter((q: any) => q.eq(q.field("teamId"), order.teamId))
+        .first();
+
+      if (!membership) {
+        throw new Error("User is not a member of this team");
+      }
+
+      if (!membership.isActive) {
+        throw new Error("User membership is not active");
+      }
+
+      if (membership.isBlocked) {
+        throw new Error("User is blocked from this team");
+      }
+
+      if (membership.role !== "admin") {
+        throw new Error(
+          `User role is ${membership.role}, must be admin to manage permissions`,
+        );
+      }
+    } else {
+      throw new Error("Not authorized");
+    }
+
+    // Validate that all userIds are active team members
+    for (const targetUserId of args.userIds) {
+      const targetMembership = await ctx.db
+        .query("resellerMembers")
+        .withIndex("by_user", (q: any) => q.eq("userId", targetUserId))
+        .filter((q: any) => q.eq(q.field("teamId"), order.teamId))
+        .first();
+
+      if (
+        !targetMembership ||
+        !targetMembership.isActive ||
+        targetMembership.isBlocked
+      ) {
+        throw new Error(`User ${targetUserId} is not an active team member`);
+      }
+    }
+
+    const now = Date.now();
+    await ctx.db.patch(args.orderId, {
+      readAccessUserIds: args.userIds,
+      updatedAt: now,
+    });
+
+    await ctx.db.insert("auditLogs", {
+      actorUserId: userId,
+      entity: "order",
+      entityId: String(args.orderId),
+      action: "order_read_access_updated",
+      metadata: { userIds: args.userIds },
+      orderId: args.orderId,
+      createdAt: now,
+    });
+
+    return null;
+  },
+});
+
+// Update write access permissions for an order (owner and reseller admin)
+export const updateOrderWriteAccess = mutation({
+  args: {
+    orderId: v.id("orders"),
+    userIds: v.array(v.id("users")),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const { userId, user } = await requireViewer(ctx);
+
+    const order = await ctx.db.get(args.orderId);
+    if (!order) throw new Error("Order not found");
+
+    // Owner can manage any order's permissions
+    if (user.role === "owner") {
+      // Continue to update permissions
+    } else if (user.role === "reseller") {
+      // Check if user is admin of the order's team
+      const membership = await ctx.db
+        .query("resellerMembers")
+        .withIndex("by_user", (q: any) => q.eq("userId", userId))
+        .filter((q: any) => q.eq(q.field("teamId"), order.teamId))
+        .first();
+
+      if (!membership) {
+        throw new Error("User is not a member of this team");
+      }
+
+      if (!membership.isActive || membership.isBlocked) {
+        throw new Error(`Membership is not active or is blocked`);
+      }
+
+      if (membership.role !== "admin") {
+        throw new Error(
+          `User role is ${membership.role}, must be admin to manage permissions`,
+        );
+      }
+    } else {
+      throw new Error("Not authorized");
+    }
+
+    // Validate that all userIds are active team members
+    for (const targetUserId of args.userIds) {
+      const targetMembership = await ctx.db
+        .query("resellerMembers")
+        .withIndex("by_user", (q: any) => q.eq("userId", targetUserId))
+        .filter((q: any) => q.eq(q.field("teamId"), order.teamId))
+        .first();
+
+      if (
+        !targetMembership ||
+        !targetMembership.isActive ||
+        targetMembership.isBlocked
+      ) {
+        throw new Error(`User ${targetUserId} is not an active team member`);
+      }
+    }
+
+    const now = Date.now();
+    await ctx.db.patch(args.orderId, {
+      writeAccessUserIds: args.userIds,
+      updatedAt: now,
+    });
+
+    await ctx.db.insert("auditLogs", {
+      actorUserId: userId,
+      entity: "order",
+      entityId: String(args.orderId),
+      action: "order_write_access_updated",
+      metadata: { userIds: args.userIds },
+      orderId: args.orderId,
+      createdAt: now,
+    });
+
+    return null;
+  },
+});
+
+// Get who has access to an order (read-only view for members and staff)
+export const getOrderAccessInfo = query({
+  args: { orderId: v.id("orders") },
+  returns: v.object({
+    readAccessUsers: v.array(
+      v.object({
+        _id: v.id("users"),
+        name: v.optional(v.string()),
+        email: v.string(),
+      }),
+    ),
+    writeAccessUsers: v.array(
+      v.object({
+        _id: v.id("users"),
+        name: v.optional(v.string()),
+        email: v.string(),
+      }),
+    ),
+  }),
+  handler: async (ctx, args) => {
+    const { userId, user } = await requireViewer(ctx);
+    const order = await ctx.db.get(args.orderId);
+    if (!order) throw new Error("Order not found");
+
+    // Check if user has permission to view this order
+    const hasAccess =
+      user.role === "owner" ||
+      order.createdByUserId === userId ||
+      (user.role === "staff" && order.pickedByStaffUserId === userId) ||
+      order.readAccessUserIds.includes(userId) ||
+      order.writeAccessUserIds.includes(userId);
+
+    if (!hasAccess && user.role === "reseller") {
+      const membership = await ctx.db
+        .query("resellerMembers")
+        .withIndex("by_user", (q: any) => q.eq("userId", userId))
+        .filter((q: any) => q.eq(q.field("teamId"), order.teamId))
+        .first();
+      if (!membership || !membership.isActive || membership.isBlocked) {
+        throw new Error("Not authorized");
+      }
+    }
+
+    // Get user details for read access
+    const readAccessUsers = await Promise.all(
+      order.readAccessUserIds.map(async (uid) => {
+        const u = await ctx.db.get(uid);
+        return u ? { _id: u._id, name: u.name, email: u.email } : null;
+      }),
+    );
+
+    // Get user details for write access
+    const writeAccessUsers = await Promise.all(
+      order.writeAccessUserIds.map(async (uid) => {
+        const u = await ctx.db.get(uid);
+        return u ? { _id: u._id, name: u.name, email: u.email } : null;
+      }),
+    );
+
+    return {
+      readAccessUsers: readAccessUsers.filter(Boolean) as any,
+      writeAccessUsers: writeAccessUsers.filter(Boolean) as any,
+    };
   },
 });

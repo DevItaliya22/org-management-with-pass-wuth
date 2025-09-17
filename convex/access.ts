@@ -8,7 +8,9 @@ export const getViewerOrThrow = internalQuery({
   returns: v.object({
     user: v.object({
       _id: v.id("users"),
-      role: v.optional(v.union(v.literal("owner"), v.literal("reseller"), v.literal("staff"))),
+      role: v.optional(
+        v.union(v.literal("owner"), v.literal("reseller"), v.literal("staff")),
+      ),
     }),
   }),
   handler: async (ctx) => {
@@ -40,7 +42,12 @@ export const getUserTeams = internalQuery({
       .withIndex("by_user", (q) => q.eq("userId", args.userId))
       .collect();
     return memberships
-      .filter((m) => m.status === "active_member" && (m.role === "admin" || m.role === "member"))
+      .filter(
+        (m) =>
+          m.isActive &&
+          !m.isBlocked &&
+          (m.role === "admin" || m.role === "member"),
+      )
       .map((m) => ({ teamId: m.teamId, role: m.role }));
   },
 });
@@ -62,7 +69,8 @@ export const canReadOrder = internalQuery({
     if (order.createdByUserId === args.userId) return true;
 
     // Staff can read orders they picked
-    if (user.role === "staff" && order.pickedByStaffUserId === args.userId) return true;
+    if (user.role === "staff" && order.pickedByStaffUserId === args.userId)
+      return true;
 
     // Reseller admin can read all orders in their teams
     if (user.role === "reseller") {
@@ -70,7 +78,13 @@ export const canReadOrder = internalQuery({
         .query("resellerMembers")
         .withIndex("by_user", (q) => q.eq("userId", args.userId))
         .collect();
-      const isAdminForTeam = memberships.some((m: any) => m.teamId === order.teamId && m.role === "admin" && m.status === "active_member");
+      const isAdminForTeam = memberships.some(
+        (m: any) =>
+          m.teamId === order.teamId &&
+          m.role === "admin" &&
+          m.isActive &&
+          !m.isBlocked,
+      );
       if (isAdminForTeam) return true;
       // Members only their own orders (already covered by creator check)
     }
@@ -78,5 +92,3 @@ export const canReadOrder = internalQuery({
     return false;
   },
 });
-
-

@@ -217,15 +217,19 @@ export default function UserDetailPage({ params }: UserDetailPageProps) {
                   </span>
                   <Badge
                     variant={
-                      userDetails.resellerMember.status === "active_member"
+                      userDetails.resellerMember.isActive &&
+                      !userDetails.resellerMember.isBlocked
                         ? "default"
-                        : userDetails.resellerMember.status ===
-                            "suspended_member"
+                        : userDetails.resellerMember.isBlocked
                           ? "destructive"
                           : "secondary"
                     }
                   >
-                    {userDetails.resellerMember.status.replace("_", " ")}
+                    {userDetails.resellerMember.isBlocked
+                      ? "blocked"
+                      : userDetails.resellerMember.isActive
+                        ? "active"
+                        : "inactive"}
                   </Badge>
                 </div>
               </div>
