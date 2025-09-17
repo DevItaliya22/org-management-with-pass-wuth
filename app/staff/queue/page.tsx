@@ -61,6 +61,8 @@ export default function StaffQueuePage() {
   const [merchantLink, setMerchantLink] = useState("");
   const [nameOnOrder, setNameOnOrder] = useState("");
   const [finalValueUsd, setFinalValueUsd] = useState("");
+  const [passOpen, setPassOpen] = useState(false);
+  const [passReason, setPassReason] = useState("");
 
   // Drag & Drop (HTML5) state
   const handleDragStart = (
@@ -175,61 +177,25 @@ export default function StaffQueuePage() {
                     <div className="text-xs text-muted-foreground truncate">
                       {item._raw?.customerName} • {item._raw?.sla}
                     </div>
-                    {col.id === "queue" && (
-                      <div className="mt-2 flex gap-2">
-                        <Button
-                          size="sm"
-                          onClick={() => pick({ orderId: item.id as any })}
-                        >
-                          Pick
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() =>
-                            pass({
-                              orderId: item.id as any,
-                              reason: "Not suitable",
-                            })
-                          }
-                        >
-                          Pass
-                        </Button>
-                      </div>
-                    )}
-                    {col.id === "in_progress" && (
-                      <div className="mt-2 flex gap-2">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() =>
-                            hold({
-                              orderId: item.id as any,
-                              reason: "Waiting for info",
-                            })
-                          }
-                        >
-                          Hold
-                        </Button>
-                      </div>
-                    )}
-                    {col.id === "on_hold" && (
-                      <div className="mt-2 flex gap-2">
-                        <Button
-                          size="sm"
-                          onClick={() => resume({ orderId: item.id as any })}
-                        >
-                          Resume
-                        </Button>
-                      </div>
-                    )}
                   </KanbanCard>
                 )}
               </KanbanCards>
             </KanbanBoard>
           )}
         </KanbanProvider>
-        <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+        <AlertDialog
+          open={confirmOpen}
+          onOpenChange={(open) => {
+            setConfirmOpen(open);
+            if (!open) {
+              setPendingMove(null);
+              setHoldReason("");
+              setMerchantLink("");
+              setNameOnOrder("");
+              setFinalValueUsd("");
+            }
+          }}
+        >
           <AlertDialogContent>
             <AlertDialogHeader>
               <AlertDialogTitle>Confirm move</AlertDialogTitle>
@@ -281,6 +247,17 @@ export default function StaffQueuePage() {
               <AlertDialogCancel onClick={() => setPendingMove(null)}>
                 Cancel
               </AlertDialogCancel>
+              {pendingMove?.from === "queue" && pendingMove?.to === "in_progress" && (
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setConfirmOpen(false);
+                    setPassOpen(true);
+                  }}
+                >
+                  Pass
+                </Button>
+              )}
               <AlertDialogAction
                 onClick={async () => {
                   if (!pendingMove) return;
@@ -351,6 +328,58 @@ export default function StaffQueuePage() {
                 }}
               >
                 Confirm
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+        {/* Pass-only modal */}
+        <AlertDialog
+          open={passOpen}
+          onOpenChange={(open) => {
+            setPassOpen(open);
+            if (!open) {
+              setPassReason("");
+            }
+          }}
+        >
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Pass order</AlertDialogTitle>
+              <AlertDialogDescription>
+                Please provide a reason for passing this order.
+              </AlertDialogDescription>
+              <div className="mt-3 space-y-2">
+                <Label>Reason</Label>
+                <Input
+                  value={passReason}
+                  onChange={(e) => setPassReason(e.target.value)}
+                  placeholder="Enter reason for pass"
+                />
+              </div>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel
+                onClick={() => {
+                  setPassOpen(false);
+                  setPassReason("");
+                }}
+              >
+                Cancel
+              </AlertDialogCancel>
+              <AlertDialogAction
+                disabled={!passReason.trim()}
+                onClick={async () => {
+                  try {
+                    if (!pendingMove?.id) return;
+                    await pass({ orderId: pendingMove.id as any, reason: passReason.trim() });
+                  } finally {
+                    setPassOpen(false);
+                    setPassReason("");
+                    setPendingMove(null);
+                  }
+                }}
+              >
+                Confirm Pass
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
