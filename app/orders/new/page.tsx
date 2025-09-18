@@ -5,6 +5,7 @@ import { api } from "@/convex/_generated/api";
 import DashboardLayout from "@/components/Dashboard/DashboardLayout";
 import { useRole } from "@/hooks/use-role";
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -15,6 +16,7 @@ import { Upload, File, X } from "lucide-react";
 
 export default function NewOrderPage() {
   const { session, isLoading,  isStaff ,isOwner } = useRole();
+  const router = useRouter();
   const categories = useQuery(api.orders.listActiveCategories, {});
   const createOrder = useMutation(api.orders.createOrder);
   const generateUploadUrl = useMutation(api.files.generateUploadUrl);
@@ -41,6 +43,7 @@ export default function NewOrderPage() {
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [uploadedFileIds, setUploadedFileIds] = useState<string[]>([]);
   const [uploading, setUploading] = useState(false);
+  const [redirecting, setRedirecting] = useState(false);
 
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(event.target.files || []);
@@ -145,33 +148,37 @@ export default function NewOrderPage() {
           entityId: orderId as unknown as string,
         });
       }
-      setMsg("Order created");
-      // Reset form fields after successful creation
-      setCategoryId(undefined);
-      setCartValueUsd("");
-      setMerchant("");
-      setCustomerName("");
-      setCountry("");
-      setCity("");
-      setContact("");
-      setSla("asap");
-      setPickupAddress("");
-      setDeliveryAddress("");
-      setTimeWindow("");
-      setItemsSummary("");
-      setCurrencyOverride("USD");
-      setSelectedFiles([]);
-      setUploadedFileIds([]);
+      // Smooth redirect to the created order's page
+      const url = `/orders/${orderId}`;
+      setRedirecting(true);
+      try {
+        router.prefetch?.(url);
+      } catch {}
+      setTimeout(() => {
+        router.replace(url);
+      }, 50);
+      return;
     } catch (e: any) {
       setMsg(e?.message || "Failed to create order");
     } finally {
-      setSubmitting(false);
+      if (!redirecting) setSubmitting(false);
     }
   };
 
   return (
     <DashboardLayout>
       <div className="p-6 max-w-6xl mx-auto">
+        {(submitting || uploading || redirecting) && (
+          <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/10">
+            <div className="rounded-md bg-white shadow px-4 py-3 text-sm flex items-center gap-2 border">
+              <svg className="animate-spin h-4 w-4 text-gray-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+              <span>{redirecting ? "Redirecting to order…" : (uploading ? "Uploading files…" : "Creating order…")}</span>
+            </div>
+          </div>
+        )}
         <div className="mb-6">
           <h1 className="text-3xl font-bold tracking-tight">Create New Order</h1>
           <p className="text-muted-foreground mt-2">Fill in the details below to create a new order</p>

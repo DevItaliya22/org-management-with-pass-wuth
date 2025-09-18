@@ -25,12 +25,28 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { notFound } from "next/navigation";
 import DashboardLayout from "@/components/Dashboard/DashboardLayout";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useIsMobile } from "@/hooks/use-mobile";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import Link from "next/link";
+import { Eye } from "lucide-react";
 
 export default function StaffQueuePage() {
   const { isLoading, isStaff } = useRole();
+  const isMobile = useIsMobile();
+  const [view, setView] = useState<"kanban" | "list">("kanban");
+  const [lane, setLane] = useState<
+    "queue" | "in_progress" | "on_hold" | "fulfil_submitted"
+  >("queue");
   const queue = useQuery(
     api.orders.staffInQueue,
     isLoading
@@ -63,6 +79,11 @@ export default function StaffQueuePage() {
   const [finalValueUsd, setFinalValueUsd] = useState("");
   const [passOpen, setPassOpen] = useState(false);
   const [passReason, setPassReason] = useState("");
+  const [dialogContext, setDialogContext] = useState<"general" | "listStart">("general");
+
+  useEffect(() => {
+    if (isMobile) setView("list");
+  }, [isMobile]);
 
   // Drag & Drop (HTML5) state
   const handleDragStart = (
@@ -141,10 +162,31 @@ export default function StaffQueuePage() {
     })),
   ];
 
+  const grouped: Record<string, any[]> = {
+    queue: [],
+    in_progress: [],
+    on_hold: [],
+    fulfil_submitted: [],
+  };
+  for (const item of data) {
+    if (grouped[item.column]) grouped[item.column].push(item);
+  }
+
   return (
     <DashboardLayout>
       <div className="p-4">
-        <KanbanProvider
+        <div className="flex items-center justify-between gap-3 mb-4">
+          <h1 className="text-lg font-semibold">My Work</h1>
+          <Tabs value={view} onValueChange={(v) => setView(v as any)}>
+            <TabsList className="grid grid-cols-2">
+              <TabsTrigger value="kanban">Kanban</TabsTrigger>
+              <TabsTrigger value="list">List</TabsTrigger>
+            </TabsList>
+          </Tabs>
+        </div>
+
+        {view === "kanban" ? (
+          <KanbanProvider
           columns={columns}
           data={data}
           className="grid-cols-1 md:grid-cols-4"
@@ -158,31 +200,282 @@ export default function StaffQueuePage() {
             setConfirmOpen(true);
           }}
         >
-          {(col) => (
-            <KanbanBoard id={col.id} key={col.id}>
-              <KanbanHeader>{col.name}</KanbanHeader>
-              <KanbanCards id={col.id}>
-                {(item: any) => (
-                  <KanbanCard id={item.id} name={item.name} column={col.id}>
+            {(col) => (
+              <KanbanBoard id={col.id} key={col.id}>
+                <KanbanHeader>{col.name}</KanbanHeader>
+                <KanbanCards id={col.id}>
+                  {(item: any) => (
+                    <KanbanCard id={item.id} name={item.name} column={col.id}>
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="font-medium text-sm truncate">
+                          {item._raw?.merchant}
+                        </div>
+                        <Badge
+                          variant={col.id === "queue" ? "secondary" : "default"}
+                        >
+                          ${item._raw?.cartValueUsd}
+                        </Badge>
+                      </div>
+                      <div className="text-xs text-muted-foreground truncate">
+                        {item._raw?.customerName} • {item._raw?.sla}
+                      </div>
+                    </KanbanCard>
+                  )}
+                </KanbanCards>
+              </KanbanBoard>
+            )}
+          </KanbanProvider>
+        ) : (
+          isMobile ? (
+            <div>
+              <Select value={lane} onValueChange={(v) => setLane(v as any)}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select lane" />
+                </SelectTrigger>
+                <SelectContent>
+                  {columns.map((c) => (
+                    <SelectItem key={c.id} value={c.id as any}>
+                      {c.name} ({grouped[c.id]?.length ?? 0})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <div className="mt-4 grid gap-3">
+                {(grouped[lane] ?? []).length === 0 && (
+                  <div className="text-sm text-muted-foreground">No orders</div>
+                )}
+                {(grouped[lane] ?? []).map((item: any) => (
+                  <Card key={item.id} className="p-3">
                     <div className="flex items-center justify-between gap-2">
                       <div className="font-medium text-sm truncate">
                         {item._raw?.merchant}
                       </div>
-                      <Badge
-                        variant={col.id === "queue" ? "secondary" : "default"}
-                      >
-                        ${item._raw?.cartValueUsd}
-                      </Badge>
+                      <div className="flex items-center gap-1">
+                        <Button size="icon" variant="ghost" className="h-7 w-7" asChild aria-label="View order">
+                          <Link href={`/orders/${item.id}`}>
+                            <Eye className="h-4 w-4" />
+                          </Link>
+                        </Button>
+                        <Badge variant={lane === "queue" ? "secondary" : "default"}>
+                          ${item._raw?.cartValueUsd}
+                        </Badge>
+                      </div>
                     </div>
-                    <div className="text-xs text-muted-foreground truncate">
+                    <div className="text-xs text-muted-foreground mt-1 truncate">
                       {item._raw?.customerName} • {item._raw?.sla}
                     </div>
-                  </KanbanCard>
-                )}
-              </KanbanCards>
-            </KanbanBoard>
-          )}
-        </KanbanProvider>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                        {lane === "queue" && (
+                          <>
+                            <Button
+                              size="sm"
+                              onClick={() => {
+                                setPendingMove({ id: item.id as string, from: "queue", to: "in_progress" });
+                                setConfirmOpen(true);
+                                setDialogContext("listStart");
+                              }}
+                            >
+                              Start
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="secondary"
+                              onClick={() => {
+                                setPendingMove({ id: item.id as string, from: "queue", to: "on_hold" });
+                                setConfirmOpen(true);
+                              }}
+                            >
+                              Hold
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => {
+                                setPendingMove({ id: item.id as string, from: "queue", to: "in_progress" });
+                                setPassOpen(true);
+                              }}
+                            >
+                              Pass
+                            </Button>
+                          </>
+                        )}
+                      {lane === "in_progress" && (
+                        <>
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            onClick={() => {
+                              setPendingMove({ id: item.id as string, from: "in_progress", to: "on_hold" });
+                              setConfirmOpen(true);
+                            }}
+                          >
+                            Hold
+                          </Button>
+                          <Button
+                            size="sm"
+                            onClick={() => {
+                              setPendingMove({ id: item.id as string, from: "in_progress", to: "fulfil_submitted" });
+                              setConfirmOpen(true);
+                            }}
+                          >
+                            Submit Fulfilment
+                          </Button>
+                        </>
+                      )}
+                      {lane === "on_hold" && (
+                        <>
+                          <Button
+                            size="sm"
+                            onClick={() => {
+                              setPendingMove({ id: item.id as string, from: "on_hold", to: "in_progress" });
+                              setConfirmOpen(true);
+                            }}
+                          >
+                            Resume
+                          </Button>
+                          <Button
+                            size="sm"
+                            onClick={() => {
+                              setPendingMove({ id: item.id as string, from: "on_hold", to: "fulfil_submitted" });
+                              setConfirmOpen(true);
+                            }}
+                          >
+                            Submit Fulfilment
+                          </Button>
+                        </>
+                      )}
+                    </div>
+                  </Card>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <Tabs defaultValue="queue">
+              <TabsList className="w-full grid grid-cols-4">
+                {columns.map((c) => (
+                  <TabsTrigger key={c.id} value={c.id as any}>
+                    <span className="truncate">{c.name}</span>
+                    <Badge className="ml-2" variant={c.id === "queue" ? "secondary" : "outline"}>
+                      {grouped[c.id]?.length ?? 0}
+                    </Badge>
+                  </TabsTrigger>
+                ))}
+              </TabsList>
+              {columns.map((c) => (
+                <TabsContent key={c.id} value={c.id as any}>
+                  <div className="mt-4 grid gap-3">
+                    {(grouped[c.id] ?? []).length === 0 && (
+                      <div className="text-sm text-muted-foreground">No orders</div>
+                    )}
+                    {(grouped[c.id] ?? []).map((item: any) => (
+                      <Card key={item.id} className="p-3">
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="font-medium text-sm truncate">
+                            {item._raw?.merchant}
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <Button size="icon" variant="ghost" className="h-7 w-7" asChild aria-label="View order">
+                              <Link href={`/orders/${item.id}`}>
+                                <Eye className="h-4 w-4" />
+                              </Link>
+                            </Button>
+                            <Badge variant={c.id === "queue" ? "secondary" : "default"}>
+                              ${item._raw?.cartValueUsd}
+                            </Badge>
+                          </div>
+                        </div>
+                        <div className="text-xs text-muted-foreground mt-1 truncate">
+                          {item._raw?.customerName} • {item._raw?.sla}
+                        </div>
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          {c.id === "queue" && (
+                            <>
+                              <Button
+                                size="sm"
+                                onClick={() => {
+                                  setPendingMove({ id: item.id as string, from: "queue", to: "in_progress" });
+                                  setConfirmOpen(true);
+                                  setDialogContext("listStart");
+                                }}
+                              >
+                                Start
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="secondary"
+                                onClick={() => {
+                                  setPendingMove({ id: item.id as string, from: "queue", to: "on_hold" });
+                                  setConfirmOpen(true);
+                                }}
+                              >
+                                Hold
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => {
+                                  setPendingMove({ id: item.id as string, from: "queue", to: "in_progress" });
+                                  setPassOpen(true);
+                                }}
+                              >
+                                Pass
+                              </Button>
+                            </>
+                          )}
+                          {c.id === "in_progress" && (
+                            <>
+                              <Button
+                                size="sm"
+                                variant="secondary"
+                                onClick={() => {
+                                  setPendingMove({ id: item.id as string, from: "in_progress", to: "on_hold" });
+                                  setConfirmOpen(true);
+                                }}
+                              >
+                                Hold
+                              </Button>
+                              <Button
+                                size="sm"
+                                onClick={() => {
+                                  setPendingMove({ id: item.id as string, from: "in_progress", to: "fulfil_submitted" });
+                                  setConfirmOpen(true);
+                                }}
+                              >
+                                Submit Fulfilment
+                              </Button>
+                            </>
+                          )}
+                          {c.id === "on_hold" && (
+                            <>
+                              <Button
+                                size="sm"
+                                onClick={() => {
+                                  setPendingMove({ id: item.id as string, from: "on_hold", to: "in_progress" });
+                                  setConfirmOpen(true);
+                                }}
+                              >
+                                Resume
+                              </Button>
+                              <Button
+                                size="sm"
+                                onClick={() => {
+                                  setPendingMove({ id: item.id as string, from: "on_hold", to: "fulfil_submitted" });
+                                  setConfirmOpen(true);
+                                }}
+                              >
+                                Submit Fulfilment
+                              </Button>
+                            </>
+                          )}
+                        </div>
+                      </Card>
+                    ))}
+                  </div>
+                </TabsContent>
+              ))}
+            </Tabs>
+          )
+        )}
         <AlertDialog
           open={confirmOpen}
           onOpenChange={(open) => {
@@ -193,6 +486,7 @@ export default function StaffQueuePage() {
               setMerchantLink("");
               setNameOnOrder("");
               setFinalValueUsd("");
+              setDialogContext("general");
             }
           }}
         >
@@ -201,7 +495,9 @@ export default function StaffQueuePage() {
               <AlertDialogTitle>Confirm move</AlertDialogTitle>
               <AlertDialogDescription>
                 {pendingMove
-                  ? `Move order from "${columns.find((c) => c.id === pendingMove.from)?.name}" to "${columns.find((c) => c.id === pendingMove.to)?.name}"`
+                  ? dialogContext === "listStart" && pendingMove.from === "queue" && pendingMove.to === "in_progress"
+                    ? "Start working on this order?"
+                    : `Move order from "${columns.find((c) => c.id === pendingMove.from)?.name}" to "${columns.find((c) => c.id === pendingMove.to)?.name}"`
                   : ""}
               </AlertDialogDescription>
               {pendingMove?.to === "on_hold" && (
@@ -247,7 +543,7 @@ export default function StaffQueuePage() {
               <AlertDialogCancel onClick={() => setPendingMove(null)}>
                 Cancel
               </AlertDialogCancel>
-              {pendingMove?.from === "queue" && pendingMove?.to === "in_progress" && (
+              {dialogContext === "general" && pendingMove?.from === "queue" && pendingMove?.to === "in_progress" && (
                 <Button
                   variant="outline"
                   onClick={() => {
