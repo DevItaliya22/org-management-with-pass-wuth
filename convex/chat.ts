@@ -69,34 +69,37 @@ async function checkReadAccess(
 
 export const getChatMessages = query({
   args: { chatId: v.id("chats") },
-  returns: v.object({
-    chat: v.object({
-      _id: v.id("chats"),
-      _creationTime: v.number(),
-      orderId: v.id("orders"),
-      isOpen: v.boolean(),
-      openedAt: v.number(),
-      closedAt: v.optional(v.number()),
-    }),
-    messages: v.array(
-      v.object({
-        _id: v.id("messages"),
+  returns: v.union(
+    v.null(),
+    v.object({
+      chat: v.object({
+        _id: v.id("chats"),
         _creationTime: v.number(),
-        chatId: v.id("chats"),
-        senderUserId: v.id("users"),
-        senderName: v.optional(v.string()),
-        content: v.optional(v.string()),
-        attachmentFileIds: v.optional(v.array(v.id("files"))),
-        createdAt: v.number(),
-        viewedByUserIds: v.array(v.id("users")),
+        orderId: v.id("orders"),
+        isOpen: v.boolean(),
+        openedAt: v.number(),
+        closedAt: v.optional(v.number()),
       }),
-    ),
-  }),
+      messages: v.array(
+        v.object({
+          _id: v.id("messages"),
+          _creationTime: v.number(),
+          chatId: v.id("chats"),
+          senderUserId: v.id("users"),
+          senderName: v.optional(v.string()),
+          content: v.optional(v.string()),
+          attachmentFileIds: v.optional(v.array(v.id("files"))),
+          createdAt: v.number(),
+          viewedByUserIds: v.array(v.id("users")),
+        }),
+      ),
+    }),
+  ),
   handler: async (ctx, args) => {
     const { userId } = await requireViewer(ctx);
 
     const chat = await ctx.db.get(args.chatId);
-    if (!chat) throw new Error("Chat not found");
+    if (!chat) return null;
 
     // Check if user has read access to the order
     const hasReadAccess = await checkReadAccess(ctx, userId, chat.orderId);
