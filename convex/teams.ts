@@ -3,6 +3,7 @@ import { v } from "convex/values";
 import { Id } from "./_generated/dataModel";
 import { generateRandomTeamName } from "./lib/teamNames";
 import { getAuthUserId } from "@convex-dev/auth/server";
+import { internal } from "./_generated/api";
 
 // Create a new team with random name
 export const createTeam = internalMutation({
@@ -174,6 +175,24 @@ export const requestPromotion = mutation({
       requestedAt: now,
       status: "pending",
     });
+
+    // Notify owners by email
+    const [team, requester] = await Promise.all([
+      ctx.db.get(args.teamId),
+      ctx.db.get(userId),
+    ]);
+    const owners = await ctx.db
+      .query("users")
+      .withIndex("by_role", (q: any) => q.eq("role", "owner"))
+      .collect();
+    const ownerEmails = owners
+      .map((o: any) => o.email)
+      .filter((e: any) => typeof e === "string" && e.length > 0);
+    await ctx.scheduler.runAfter(0, internal.otp.sendEmailAction.sendPromotionRequestEmail, {
+      ownerEmails,
+      requesterEmail: (requester as any)?.email ?? "",
+      teamName: team?.name ?? "Team",
+    });
     return id;
   },
 });
@@ -322,7 +341,7 @@ export const inviteToTeam = mutation({
     const expiresAt = now + 7 * 24 * 60 * 60 * 1000;
     const invitationToken = `${args.teamId}:${now}:${Math.random().toString(36).slice(2, 10)}`;
 
-    return await ctx.db.insert("teamInvitationRequests", {
+    const invitationId = await ctx.db.insert("teamInvitationRequests", {
       teamId: args.teamId,
       invitedEmail: args.invitedEmail.toLowerCase(),
       invitedByUserId: inviterId,
@@ -333,6 +352,28 @@ export const inviteToTeam = mutation({
       expiresAt,
       invitationToken,
     });
+
+    // Prepare and send emails (invitee + owners)
+    const [team, inviterUser] = await Promise.all([
+      ctx.db.get(args.teamId),
+      ctx.db.get(inviterId),
+    ]);
+    const owners = await ctx.db
+      .query("users")
+      .withIndex("by_role", (q: any) => q.eq("role", "owner"))
+      .collect();
+    const ownerEmails = owners
+      .map((o: any) => o.email)
+      .filter((e: any) => typeof e === "string" && e.length > 0);
+
+    await ctx.scheduler.runAfter(0, internal.otp.sendEmailAction.sendTeamInviteEmails, {
+      invitedEmail: args.invitedEmail.toLowerCase(),
+      ownerEmails,
+      inviterEmail: (inviterUser as any)?.email ?? "",
+      teamName: team?.name ?? "Team",
+    });
+
+    return invitationId;
   },
 });
 
