@@ -9,6 +9,7 @@ import { useRef, useState, useEffect } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
+import { X } from "lucide-react";
 
 type OrderChatProps = {
   orderId: string;
@@ -70,22 +71,79 @@ export default function OrderChat({
   const saveUploadedFile = useMutation(api.chat.saveUploadedFile);
 
   // File attachment component
-  const FileAttachment = ({ fileId }: { fileId: Id<"files"> }) => {
-    const fileUrl = useQuery(api.chat.getFileUrl, { fileId });
+  const FileAttachment = ({ fileId, isOwn }: { fileId: Id<"files">; isOwn: boolean }) => {
+    const fileData = useQuery(api.files.getFileById, { fileId });
+    const [showImage, setShowImage] = useState(false);
 
-    if (!fileUrl) {
+    if (!fileData) {
       return <span className="text-xs opacity-60">Loading...</span>;
     }
 
+    const isImage = (filename: string) => {
+      const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp'];
+      return imageExtensions.some(ext => filename.toLowerCase().endsWith(ext));
+    };
+
+    const handleClick = () => {
+      if (isImage(fileData.uiName)) {
+        setShowImage(true);
+      } else {
+        window.open(fileData.url, '_blank');
+      }
+    };
+
     return (
-      <a
-        href={fileUrl}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="text-xs underline hover:no-underline"
-      >
-        📎 Download
-      </a>
+      <>
+        {isImage(fileData.uiName) ? (
+          <div className="cursor-pointer" onClick={handleClick}>
+            <img
+              src={fileData.url}
+              alt={fileData.uiName}
+              className="max-w-[200px] max-h-[150px] object-cover rounded-lg border-0 ring-0 outline-none"
+              onError={(e) => {
+                console.error('Failed to load image:', fileData.url);
+                e.currentTarget.style.display = 'none';
+              }}
+            />
+          </div>
+        ) : (
+          <div className={`inline-flex rounded-md px-3 py-2 ${isOwn ? 'bg-primary text-primary-foreground' : 'bg-muted text-foreground'}`}>
+            <a
+              href={fileData.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs underline hover:no-underline"
+            >
+              📎 {fileData.uiName}
+            </a>
+          </div>
+        )}
+
+        {/* Image Overlay */}
+        {isImage(fileData.uiName) && showImage && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-90">
+            <div className="relative max-w-[90vw] max-h-[90vh]">
+              <img
+                src={fileData.url}
+                alt={fileData.uiName}
+                className="max-w-full max-h-full object-contain rounded-lg"
+                onError={(e) => {
+                  console.error('Failed to load image:', fileData.url);
+                  e.currentTarget.style.display = 'none';
+                }}
+              />
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowImage(false)}
+                className="absolute top-2 right-2 bg-red-600 text-white hover:bg-red-700 h-8 w-8 p-0 rounded-full"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+        )}
+      </>
     );
   };
 
@@ -183,10 +241,17 @@ export default function OrderChat({
                         </span>
                       </div>
                       <div
-                        className={`rounded-md px-3 py-2 whitespace-pre-wrap break-words ${
-                          isOwn
-                            ? "bg-primary text-primary-foreground"
-                            : "bg-muted text-foreground"
+                        className={`rounded-md whitespace-pre-wrap break-words ${
+                          (() => {
+                            const hasText = !!msg.content && String(msg.content).trim().length > 0;
+                            const hasAttachments = Array.isArray(msg.attachmentFileIds) && msg.attachmentFileIds.length > 0;
+                            // If only attachments (e.g., images), make bubble transparent and remove padding
+                            if (hasAttachments && !hasText) return "p-0 bg-transparent text-foreground";
+                            // Otherwise use normal bubble style
+                            return isOwn
+                              ? "px-3 py-2 bg-primary text-primary-foreground"
+                              : "px-3 py-2 bg-muted text-foreground";
+                          })()
                         }`}
                       >
                         {msg.content && (
@@ -194,12 +259,16 @@ export default function OrderChat({
                         )}
                         {msg.attachmentFileIds &&
                           msg.attachmentFileIds.length > 0 && (
-                            <div className="flex flex-wrap gap-2 mt-2">
+                            <div className={`flex flex-wrap gap-2 mt-2 ${
+                              // Remove top margin if there is no text so images align flush
+                              (!!msg.content && String(msg.content).trim().length > 0) ? "" : "mt-0"
+                            }`}>
                               {msg.attachmentFileIds.map(
                                 (fileId: Id<"files">) => (
                                   <FileAttachment
                                     key={fileId}
                                     fileId={fileId}
+                                    isOwn={isOwn}
                                   />
                                 ),
                               )}

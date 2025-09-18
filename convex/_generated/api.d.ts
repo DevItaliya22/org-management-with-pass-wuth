@@ -17,6 +17,7 @@ import type * as access from "../access.js";
 import type * as auth from "../auth.js";
 import type * as chat from "../chat.js";
 import type * as cron from "../cron.js";
+import type * as files from "../files.js";
 import type * as http from "../http.js";
 import type * as lib_teamNames from "../lib/teamNames.js";
 import type * as orders from "../orders.js";
@@ -41,6 +42,7 @@ declare const fullApi: ApiFromModules<{
   auth: typeof auth;
   chat: typeof chat;
   cron: typeof cron;
+  files: typeof files;
   http: typeof http;
   "lib/teamNames": typeof lib_teamNames;
   orders: typeof orders;

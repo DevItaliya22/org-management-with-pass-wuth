@@ -10,11 +10,16 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import { Upload, File, X } from "lucide-react";
 
 export default function NewOrderPage() {
   const { session, isLoading,  isStaff ,isOwner } = useRole();
   const categories = useQuery(api.orders.listActiveCategories, {});
   const createOrder = useMutation(api.orders.createOrder);
+  const generateUploadUrl = useMutation(api.files.generateUploadUrl);
+  const saveFile = useMutation(api.files.saveFile);
+  const updateFileEntityId = useMutation(api.files.updateFileEntityId);
 
   const teamId = session?.resellerMember?.teamId as string | undefined;
 
@@ -26,8 +31,73 @@ export default function NewOrderPage() {
   const [city, setCity] = useState<string>("");
   const [contact, setContact] = useState<string>("");
   const [sla, setSla] = useState<"asap" | "today" | "24h">("asap");
+  const [pickupAddress, setPickupAddress] = useState<string>("");
+  const [deliveryAddress, setDeliveryAddress] = useState<string>("");
+  const [timeWindow, setTimeWindow] = useState<string>("");
+  const [itemsSummary, setItemsSummary] = useState<string>("");
+  const [currencyOverride, setCurrencyOverride] = useState<string>("USD");
   const [submitting, setSubmitting] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [uploadedFileIds, setUploadedFileIds] = useState<string[]>([]);
+  const [uploading, setUploading] = useState(false);
+
+  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.target.files || []);
+    setSelectedFiles(prev => [...prev, ...files]);
+  };
+
+  const removeFile = (index: number) => {
+    setSelectedFiles(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const formatFileSize = (bytes: number) => {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  };
+
+  const uploadFiles = async () => {
+    if (selectedFiles.length === 0) return [];
+    
+    setUploading(true);
+    const fileIds: string[] = [];
+    
+    try {
+      for (const file of selectedFiles) {
+        // Step 1: Get upload URL
+        const postUrl = await generateUploadUrl();
+        
+        // Step 2: Upload file
+        const result = await fetch(postUrl, {
+          method: "POST",
+          headers: { "Content-Type": file.type },
+          body: file,
+        });
+        const { storageId } = await result.json();
+        
+        // Step 3: Save file metadata
+        const fileId = await saveFile({
+          storageId,
+          uiName: file.name,
+          sizeBytes: file.size,
+          entityType: "order",
+          entityId: undefined, // Will be set after order creation
+        });
+        
+        fileIds.push(fileId);
+      }
+    } catch (error) {
+      console.error("Error uploading files:", error);
+      throw error;
+    } finally {
+      setUploading(false);
+    }
+    
+    return fileIds;
+  };
 
   if (isLoading) return <div className="p-4">Loading…</div>;
   if(isStaff || isOwner) return <div className="p-4">Not authorized</div>;
@@ -45,8 +115,12 @@ export default function NewOrderPage() {
     }
     try {
       setSubmitting(true);
+      
+      // Upload files first
+      const fileIds = await uploadFiles();
+      
       const value = parseFloat(cartValueUsd);
-      await createOrder({
+      const { orderId } = await createOrder({
         teamId: teamId as any,
         categoryId: categoryId as any,
         cartValueUsd: isNaN(value) ? 0 : value,
@@ -56,13 +130,21 @@ export default function NewOrderPage() {
         city,
         contact: contact || undefined,
         sla,
-        attachmentFileIds: [],
-        pickupAddress: undefined,
-        deliveryAddress: undefined,
-        timeWindow: undefined,
-        itemsSummary: undefined,
-        currencyOverride: undefined,
+        attachmentFileIds: fileIds as any,
+        pickupAddress: pickupAddress || undefined,
+        deliveryAddress: deliveryAddress || undefined,
+        timeWindow: timeWindow || undefined,
+        itemsSummary: itemsSummary || undefined,
+        currencyOverride: currencyOverride || undefined,
       });
+
+      // Update file entity IDs with the created order ID
+      for (const fileId of fileIds) {
+        await updateFileEntityId({
+          fileId: fileId as any,
+          entityId: orderId as unknown as string,
+        });
+      }
       setMsg("Order created");
       // Reset form fields after successful creation
       setCategoryId(undefined);
@@ -73,6 +155,13 @@ export default function NewOrderPage() {
       setCity("");
       setContact("");
       setSla("asap");
+      setPickupAddress("");
+      setDeliveryAddress("");
+      setTimeWindow("");
+      setItemsSummary("");
+      setCurrencyOverride("USD");
+      setSelectedFiles([]);
+      setUploadedFileIds([]);
     } catch (e: any) {
       setMsg(e?.message || "Failed to create order");
     } finally {
@@ -82,17 +171,24 @@ export default function NewOrderPage() {
 
   return (
     <DashboardLayout>
-      <div className="p-4">
-        <Card>
-          <CardHeader>
-            <CardTitle>Create Order</CardTitle>
+      <div className="p-6 max-w-6xl mx-auto">
+        <div className="mb-6">
+          <h1 className="text-3xl font-bold tracking-tight">Create New Order</h1>
+          <p className="text-muted-foreground mt-2">Fill in the details below to create a new order</p>
+        </div>
+        
+        <Card className="shadow-lg">
+          <CardHeader className="bg-gradient-to-r from-blue-50 to-indigo-50 border-b">
+            <CardTitle className="text-xl font-semibold text-gray-900">Order Information</CardTitle>
+            <p className="text-sm text-muted-foreground">Provide the essential details for your order</p>
           </CardHeader>
-          <CardContent>
-            <form className="grid grid-cols-1 md:grid-cols-2 gap-4" onSubmit={onSubmit}>
-              <div>
-                <Label>Category</Label>
+          <CardContent className="p-6">
+            <form className="space-y-6" onSubmit={onSubmit}>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium text-gray-700">Category *</Label>
                 <Select value={categoryId} onValueChange={setCategoryId}>
-                  <SelectTrigger>
+                    <SelectTrigger className="h-11">
                     <SelectValue placeholder="Select a category" />
                   </SelectTrigger>
                   <SelectContent>
@@ -102,34 +198,73 @@ export default function NewOrderPage() {
                   </SelectContent>
                 </Select>
               </div>
-              <div>
-                <Label>Cart Value (USD)</Label>
-                <Input value={cartValueUsd} onChange={(e) => setCartValueUsd(e.target.value)} placeholder="e.g. 120" />
+                
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium text-gray-700">Cart Value (USD) *</Label>
+                  <Input 
+                    value={cartValueUsd} 
+                    onChange={(e) => setCartValueUsd(e.target.value)} 
+                    placeholder="e.g. 120" 
+                    className="h-11"
+                    type="number"
+                    step="0.01"
+                  />
               </div>
-              <div>
-                <Label>Merchant</Label>
-                <Input value={merchant} onChange={(e) => setMerchant(e.target.value)} placeholder="e.g. Chipotle" />
+                
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium text-gray-700">Merchant *</Label>
+                  <Input 
+                    value={merchant} 
+                    onChange={(e) => setMerchant(e.target.value)} 
+                    placeholder="e.g. Chipotle" 
+                    className="h-11"
+                  />
               </div>
-              <div>
-                <Label>Customer Name</Label>
-                <Input value={customerName} onChange={(e) => setCustomerName(e.target.value)} placeholder="e.g. John Doe" />
+                
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium text-gray-700">Customer Name *</Label>
+                  <Input 
+                    value={customerName} 
+                    onChange={(e) => setCustomerName(e.target.value)} 
+                    placeholder="e.g. John Doe" 
+                    className="h-11"
+                  />
               </div>
-              <div>
-                <Label>Country</Label>
-                <Input value={country} onChange={(e) => setCountry(e.target.value)} placeholder="e.g. US" />
+                
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium text-gray-700">Country *</Label>
+                  <Input 
+                    value={country} 
+                    onChange={(e) => setCountry(e.target.value)} 
+                    placeholder="e.g. US" 
+                    className="h-11"
+                  />
               </div>
-              <div>
-                <Label>City</Label>
-                <Input value={city} onChange={(e) => setCity(e.target.value)} placeholder="e.g. NYC" />
+                
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium text-gray-700">City *</Label>
+                  <Input 
+                    value={city} 
+                    onChange={(e) => setCity(e.target.value)} 
+                    placeholder="e.g. NYC" 
+                    className="h-11"
+                  />
               </div>
-              <div>
-                <Label>Contact</Label>
-                <Input value={contact} onChange={(e) => setContact(e.target.value)} placeholder="email or phone (optional)" />
+                
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium text-gray-700">Contact</Label>
+                  <Input 
+                    value={contact} 
+                    onChange={(e) => setContact(e.target.value)} 
+                    placeholder="email or phone (optional)" 
+                    className="h-11"
+                  />
               </div>
-              <div>
-                <Label>SLA</Label>
+                
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium text-gray-700">SLA *</Label>
                 <Select value={sla} onValueChange={(v: any) => setSla(v)}>
-                  <SelectTrigger>
+                    <SelectTrigger className="h-11">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -139,10 +274,206 @@ export default function NewOrderPage() {
                   </SelectContent>
                 </Select>
               </div>
-              <div className="md:col-span-2 flex justify-end">
-                <Button type="submit" disabled={submitting}>{submitting ? "Creating…" : "Create Order"}</Button>
+                
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium text-gray-700">Currency Override</Label>
+                  <Input 
+                    value={currencyOverride} 
+                    onChange={(e) => setCurrencyOverride(e.target.value)} 
+                    placeholder="e.g. USD (default)" 
+                    className="h-11"
+                  />
+                </div>
               </div>
-              {msg && <div className="md:col-span-2 text-sm text-muted-foreground">{msg}</div>}
+              
+              {/* Address Section */}
+              <div className="space-y-4">
+                <div className="border-t pt-6">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Address Information</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium text-gray-700">Pickup Address</Label>
+                      <Textarea 
+                        value={pickupAddress} 
+                        onChange={(e) => setPickupAddress(e.target.value)} 
+                        placeholder="Enter pickup address (optional)" 
+                        rows={3}
+                        className="resize-none"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium text-gray-700">Delivery Address</Label>
+                      <Textarea 
+                        value={deliveryAddress} 
+                        onChange={(e) => setDeliveryAddress(e.target.value)} 
+                        placeholder="Enter delivery address (optional)" 
+                        rows={3}
+                        className="resize-none"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+              
+              {/* Additional Details Section */}
+              <div className="space-y-4">
+                <div className="border-t pt-6">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Additional Details</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium text-gray-700">Time Window</Label>
+                      <Input 
+                        value={timeWindow} 
+                        onChange={(e) => setTimeWindow(e.target.value)} 
+                        placeholder="e.g. pickup/delivery/showtime/flight (optional)" 
+                        className="h-11"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium text-gray-700">Items Summary / Notes</Label>
+                      <Textarea 
+                        value={itemsSummary} 
+                        onChange={(e) => setItemsSummary(e.target.value)} 
+                        placeholder="Enter items summary or notes (optional)" 
+                        rows={3}
+                        className="resize-none"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+              
+              {/* File Upload Section */}
+              <div className="space-y-4">
+                <div className="border-t pt-6">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Attachments (Optional)</h3>
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="file-upload" className="text-sm font-medium text-gray-700">
+                        Upload Files
+                      </Label>
+                      <div className="flex items-center gap-2">
+                        <Input
+                          id="file-upload"
+                          type="file"
+                          multiple
+                          onChange={handleFileSelect}
+                          className="hidden"
+                          accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.gif,.txt,.xlsx,.xls"
+                        />
+                        <Label
+                          htmlFor="file-upload"
+                          className="flex items-center gap-2 px-4 py-2 border border-dashed border-gray-300 rounded-md cursor-pointer hover:bg-gray-50 transition-colors"
+                        >
+                          <Upload className="h-4 w-4" />
+                          <span className="text-sm">Choose files</span>
+                        </Label>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        Supported formats: PDF, DOC, DOCX, JPG, PNG, GIF, TXT, XLSX, XLS
+                      </p>
+                    </div>
+                    
+                    {selectedFiles.length > 0 && (
+                      <div className="space-y-2">
+                        <div className="text-sm font-medium text-gray-700">
+                          Selected files ({selectedFiles.length}):
+                        </div>
+                        <div className="space-y-2 max-h-40 overflow-y-auto border rounded-md p-3 bg-gray-50">
+                          {selectedFiles.map((file, index) => (
+                            <div
+                              key={index}
+                              className="flex items-center justify-between p-2 bg-white rounded-md border text-sm"
+                            >
+                              <div className="flex items-center gap-2 min-w-0 flex-1">
+                                <File className="h-4 w-4 text-gray-500 flex-shrink-0" />
+                                <div className="min-w-0 flex-1">
+                                  <div className="truncate font-medium">{file.name}</div>
+                                  <div className="text-xs text-muted-foreground">
+                                    {formatFileSize(file.size)}
+                                  </div>
+                                </div>
+                              </div>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => removeFile(index)}
+                                className="h-6 w-6 p-0 text-gray-500 hover:text-red-500"
+                              >
+                                <X className="h-3 w-3" />
+                              </Button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+              
+              {/* Submit Section */}
+              <div className="border-t pt-6">
+                <div className="flex flex-col sm:flex-row gap-4 justify-between items-center">
+                  <div className="text-sm text-muted-foreground">
+                    Fields marked with * are required
+                  </div>
+                  <div className="flex gap-3">
+                    <Button 
+                      type="button" 
+                      variant="outline" 
+                      onClick={() => {
+                        setCategoryId(undefined);
+                        setCartValueUsd("");
+                        setMerchant("");
+                        setCustomerName("");
+                        setCountry("");
+                        setCity("");
+                        setContact("");
+                        setSla("asap");
+                        setPickupAddress("");
+                        setDeliveryAddress("");
+                        setTimeWindow("");
+                        setItemsSummary("");
+                        setCurrencyOverride("USD");
+                        setSelectedFiles([]);
+                        setUploadedFileIds([]);
+                        setMsg(null);
+                      }}
+                      className="px-6"
+                    >
+                      Reset Form
+                    </Button>
+                    <Button 
+                      type="submit" 
+                      disabled={submitting || uploading}
+                      className="px-8 bg-blue-600 hover:bg-blue-700"
+                    >
+                      {submitting || uploading ? (
+                        <>
+                          <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                          </svg>
+                          {uploading ? "Uploading Files..." : "Creating Order..."}
+                        </>
+                      ) : (
+                        "Create Order"
+                      )}
+                    </Button>
+                  </div>
+                </div>
+                
+                {msg && (
+                  <div className={`mt-4 p-4 rounded-lg text-sm ${
+                    msg === "Order created" 
+                      ? "bg-green-50 text-green-800 border border-green-200" 
+                      : "bg-red-50 text-red-800 border border-red-200"
+                  }`}>
+                    {msg}
+                  </div>
+                )}
+              </div>
             </form>
           </CardContent>
         </Card>

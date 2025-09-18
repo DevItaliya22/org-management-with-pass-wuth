@@ -507,8 +507,55 @@ export default function OrderDetailsPage() {
                       </span>
                     </>
                   )}
+                  {order.currencyOverride && (
+                    <>
+                      <span className="text-muted-foreground">Currency</span>
+                      <span className="col-span-2">{order.currencyOverride}</span>
+                    </>
+                  )}
+                  {order.timeWindow && (
+                    <>
+                      <span className="text-muted-foreground">Time Window</span>
+                      <span className="col-span-2">{order.timeWindow}</span>
+                    </>
+                  )}
+                  {order.itemsSummary && (
+                    <>
+                      <span className="text-muted-foreground">Items Summary</span>
+                      <span className="col-span-2 break-words">{order.itemsSummary}</span>
+                    </>
+                  )}
                 </div>
               </section>
+              
+              {/* Address Information Section */}
+              {(order.pickupAddress || order.deliveryAddress) && (
+                <>
+                  <Separator />
+                  <section className="space-y-2">
+                    <h3 className="font-medium text-sm">Address Information</h3>
+                    <div className="grid grid-cols-3 gap-2 text-sm">
+                      {order.pickupAddress && (
+                        <>
+                          <span className="text-muted-foreground">Pickup Address</span>
+                          <span className="col-span-2 break-words">
+                            {order.pickupAddress}
+                          </span>
+                        </>
+                      )}
+                      {order.deliveryAddress && (
+                        <>
+                          <span className="text-muted-foreground">Delivery Address</span>
+                          <span className="col-span-2 break-words">
+                            {order.deliveryAddress}
+                          </span>
+                        </>
+                      )}
+                    </div>
+                  </section>
+                </>
+              )}
+              
               {order.fulfilment && (
                 <>
                   <Separator />
@@ -537,6 +584,50 @@ export default function OrderDetailsPage() {
                   </section>
                 </>
               )}
+              
+              {/* Billing Information Section */}
+              {order.billing && (
+                <>
+                  <Separator />
+                  <section className="space-y-2">
+                    <h3 className="font-medium text-sm">Billing Information</h3>
+                    <div className="grid grid-cols-3 gap-2 text-sm">
+                      <span className="text-muted-foreground">Rate %</span>
+                      <span className="col-span-2 font-medium">
+                        {order.billing.ratePercent}%
+                      </span>
+                      <span className="text-muted-foreground">Floor (USD)</span>
+                      <span className="col-span-2">
+                        ${order.billing.floorUsd}
+                      </span>
+                      <span className="text-muted-foreground">Base Value (USD)</span>
+                      <span className="col-span-2">
+                        ${order.billing.baseValueUsd}
+                      </span>
+                      <span className="text-muted-foreground">Billed (USD)</span>
+                      <span className="col-span-2 font-medium">
+                        ${order.billing.billedUsd}
+                      </span>
+                    </div>
+                  </section>
+                </>
+              )}
+              
+              {/* Attachments Section */}
+              {order.attachmentFileIds && order.attachmentFileIds.length > 0 && (
+                <>
+                  <Separator />
+                  <section className="space-y-2">
+                    <h3 className="font-medium text-sm">Attachments</h3>
+                    <div className="space-y-2">
+                      {order.attachmentFileIds.map((fileId: any) => (
+                        <AttachmentFile key={fileId} fileId={fileId} />
+                      ))}
+                    </div>
+                  </section>
+                </>
+              )}
+              
               {(isOwner || isReseller) && disputes && disputes.length > 0 && (
                 <>
                   <Separator />
@@ -662,5 +753,90 @@ export default function OrderDetailsPage() {
         </div>
       </div>
     </DashboardLayout>
+  );
+}
+
+// Component to display individual attachment files
+function AttachmentFile({ fileId }: { fileId: string }) {
+  const file = useQuery(api.files.getFileById, { fileId: fileId as any });
+  const [showImage, setShowImage] = useState(false);
+  
+  if (!file) {
+    return (
+      <div className="flex items-center gap-2 p-2 bg-gray-50 rounded-md text-sm">
+        <File className="h-4 w-4 text-gray-500" />
+        <span className="text-muted-foreground">Loading file...</span>
+      </div>
+    );
+  }
+
+  const formatFileSize = (bytes: number) => {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  };
+
+  const isImage = (filename: string) => {
+    const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp'];
+    return imageExtensions.some(ext => filename.toLowerCase().endsWith(ext));
+  };
+
+  const handleViewFile = () => {
+    if (isImage(file.uiName)) {
+      setShowImage(true);
+    } else {
+      window.open(file.url, '_blank');
+    }
+  };
+
+  return (
+    <>
+      <div className="flex items-center justify-between p-2 bg-gray-50 rounded-md text-sm">
+        <div className="flex items-center gap-2 min-w-0 flex-1">
+          <File className="h-4 w-4 text-gray-500 flex-shrink-0" />
+          <div className="min-w-0 flex-1">
+            <div className="truncate font-medium">{file.uiName}</div>
+            <div className="text-xs text-muted-foreground">
+              {formatFileSize(file.sizeBytes)}
+            </div>
+          </div>
+        </div>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={handleViewFile}
+          className="h-6 px-2 text-xs"
+        >
+          View
+        </Button>
+      </div>
+
+      {/* Image Overlay */}
+      {isImage(file.uiName) && showImage && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-90">
+          <div className="relative max-w-[90vw] max-h-[90vh]">
+            <img
+              src={file.url}
+              alt={file.uiName}
+              className="max-w-full max-h-full object-contain rounded-lg"
+              onError={(e) => {
+                console.error('Failed to load image:', file.url);
+                e.currentTarget.style.display = 'none';
+              }}
+            />
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowImage(false)}
+              className="absolute top-2 right-2 bg-red-600 text-white hover:bg-red-700 h-8 w-8 p-0 rounded-full"
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+      )}
+    </>
   );
 }
