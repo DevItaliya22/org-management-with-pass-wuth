@@ -25,7 +25,7 @@ import OrderChat from "@/components/OrderChat";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { X, Upload, File, ChevronDown } from "lucide-react";
+import { X, Upload, File, ChevronDown, AlertTriangle } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -225,7 +225,30 @@ export default function OrderDetailsPage() {
   if (!ready || order === undefined) return <div className="p-4">Loading…</div>;
   if (!allowed) return notFound();
   if (order === null)
-    return <div className="p-4">Order not found or not authorized</div>;
+    return (
+      <div className="p-6 min-h-[60vh] flex items-center justify-center">
+        <Card className="max-w-xl">
+          <CardHeader>
+            <CardTitle>Access changed</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="h-5 w-5 text-amber-500 mt-0.5" />
+              <p className="text-sm text-muted-foreground">
+                This order is no longer available. It may have been picked by another staff member or your access has changed.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {isStaff && (
+                <Button size="sm" onClick={() => router.push("/staff/queue")}>Back to Queue</Button>
+              )}
+              <Button size="sm" variant="outline" onClick={() => router.back()}>Go Back</Button>
+              <Button size="sm" variant="ghost" onClick={() => router.refresh()}>Refresh</Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
 
   const canWriteToChat = !!(
     isOwner ||

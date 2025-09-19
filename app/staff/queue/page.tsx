@@ -39,6 +39,7 @@ import {
 } from "@/components/ui/select";
 import Link from "next/link";
 import { Eye } from "lucide-react";
+import { toast } from "@/components/ui/sonner";
 
 export default function StaffQueuePage() {
   const { isLoading, isStaff } = useRole();
@@ -112,16 +113,23 @@ export default function StaffQueuePage() {
 
     try {
       // Disallow moving back to queue or into fulfil_submitted via drag
-      if (targetLane === "queue" || targetLane === "fulfil_submitted") return;
+      if (targetLane === "queue") {
+        toast.error("Cannot move back to queue");
+        return;
+      }
+      if (targetLane === "fulfil_submitted") {
+        toast.error("Move to In Progress first");
+        return;
+      }
 
       if (lane === "queue" && targetLane === "in_progress") {
         await pick({ orderId });
         await start({ orderId });
         return;
       }
+      // Prevent direct move from queue -> on_hold. Must go to in_progress first.
       if (lane === "queue" && targetLane === "on_hold") {
-        await pick({ orderId });
-        await hold({ orderId, reason: "Moved to hold" });
+        toast.error("Move to In Progress first");
         return;
       }
       if (lane === "in_progress" && targetLane === "on_hold") {
@@ -196,6 +204,11 @@ export default function StaffQueuePage() {
             const from = data.find((d: any) => d.id === active.id)?.column;
             const to = columns.find((c) => c.id === (over.id as string))?.id;
             if (!from || !to || from === to) return;
+            // Disallow direct queue -> on_hold/fulfil_submitted via Kanban DnD
+            if (from === "queue" && to !== "in_progress") {
+              toast.error("Move to In Progress first");
+              return;
+            }
             setPendingMove({ id: active.id as string, from, to });
             setConfirmOpen(true);
           }}
@@ -276,16 +289,6 @@ export default function StaffQueuePage() {
                               }}
                             >
                               Start
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="secondary"
-                              onClick={() => {
-                                setPendingMove({ id: item.id as string, from: "queue", to: "on_hold" });
-                                setConfirmOpen(true);
-                              }}
-                            >
-                              Hold
                             </Button>
                             <Button
                               size="sm"
@@ -399,16 +402,6 @@ export default function StaffQueuePage() {
                                 }}
                               >
                                 Start
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="secondary"
-                                onClick={() => {
-                                  setPendingMove({ id: item.id as string, from: "queue", to: "on_hold" });
-                                  setConfirmOpen(true);
-                                }}
-                              >
-                                Hold
                               </Button>
                               <Button
                                 size="sm"
@@ -562,13 +555,10 @@ export default function StaffQueuePage() {
                     if (from === "queue" && to === "in_progress") {
                       await pick({ orderId: id as any });
                       await start({ orderId: id as any });
-                    } else if (from === "queue" && to === "on_hold") {
-                      if (!holdReason.trim()) return;
-                      await pick({ orderId: id as any });
-                      await hold({
-                        orderId: id as any,
-                        reason: holdReason.trim(),
-                      });
+                    } else if (from === "queue" && (to === "on_hold" || to === "fulfil_submitted")) {
+                      // Disallow direct moves from queue to on_hold or fulfil_submitted
+                      toast.error("Move to In Progress first");
+                      return;
                     } else if (from === "in_progress" && to === "on_hold") {
                       if (!holdReason.trim()) return;
                       await hold({

@@ -143,11 +143,17 @@ export const getOrderById = query({
     const order = await ctx.db.get(args.orderId);
     if (!order) return null;
 
-    // Local ACL: owner → all; creator → yes; staff → only if picked; reseller admin → team orders
+    // Local ACL: owner → all; creator → yes; staff → only if picked OR if submitted (in queue); reseller admin → team orders
     if (user.role === "owner") return order;
     if (order.createdByUserId === userId) return order;
     if (user.role === "staff" && order.pickedByStaffUserId === userId)
       return order;
+    // Allow staff to view submitted orders (in queue) even if not picked yet
+    if (user.role === "staff" && order.status === "submitted" && !order.pickedByStaffUserId) {
+      // Check if staff hasn't passed this order yet
+      const hasPassed = order.orderPassedByUserId?.some((p: any) => p.userId === userId);
+      if (!hasPassed) return order;
+    }
 
     // Check read access permissions
     if (
@@ -172,7 +178,8 @@ export const getOrderById = query({
         return order;
       }
     }
-    throw new Error("Not authorized");
+    // Return null instead of throwing to allow clients to handle unauthorized state gracefully
+    return null;
   },
 });
 

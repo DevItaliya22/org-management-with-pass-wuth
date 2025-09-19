@@ -71,6 +71,12 @@ export const canReadOrder = internalQuery({
     // Staff can read orders they picked
     if (user.role === "staff" && order.pickedByStaffUserId === args.userId)
       return true;
+    
+    // Staff can also read submitted orders (in queue) if they haven't passed them yet
+    if (user.role === "staff" && order.status === "submitted" && !order.pickedByStaffUserId) {
+      const hasPassed = order.orderPassedByUserId?.some((p: any) => p.userId === args.userId);
+      if (!hasPassed) return true;
+    }
 
     // Reseller admin can read all orders in their teams
     if (user.role === "reseller") {
