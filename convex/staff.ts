@@ -2,6 +2,7 @@ import { action, internalMutation, query, mutation } from "./_generated/server";
 import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { internal } from "./_generated/api";
+import { internal as internalApi } from "./_generated/api";
 
 // Create a staff user with email/password and add to staff table
 export const createStaffWithPassword = action({
@@ -33,6 +34,16 @@ export const createStaffWithPassword = action({
     const userId = createResult.user._id;
 
     await ctx.runMutation(internal.staff.finalizeStaffCreation, { userId });
+
+    // Send welcome email to the new staff member (fire-and-forget)
+    const email = args.email;
+    try {
+      await ctx.runAction(internalApi.otp.sendEmailAction.sendStaffWelcomeEmail, {
+        email,
+      });
+    } catch (err) {
+      console.error("Failed to send staff welcome email:", err);
+    }
 
     return { userId };
   },

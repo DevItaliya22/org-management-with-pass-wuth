@@ -158,3 +158,46 @@ export const sendPromotionRequestEmail = internalAction({
     return null;
   },
 });
+
+export const sendStaffWelcomeEmail = internalAction({
+  args: {
+    email: v.string(),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const smtpUser = process.env.NODEMAILER_EMAIL;
+    const smtpPass = process.env.NODEMAILER_PASSKEY;
+
+    if (!smtpUser || !smtpPass) {
+      throw new Error(
+        "Nodemailer credentials missing. Set NODEMAILER_EMAIL and NODEMAILER_PASSKEY in Convex env.",
+      );
+    }
+
+    const transporter = nodemailer.createTransport({
+      host: "smtp.gmail.com",
+      port: 465,
+      secure: true,
+      auth: { user: smtpUser, pass: smtpPass },
+    });
+
+    const siteUrl = process.env.SITE_URL || "";
+    const html = `
+      <div style="font-family: Arial, sans-serif;">
+        <h2>Welcome to the team</h2>
+        <p>Your staff account has been created.</p>
+        ${siteUrl ? `<p>You can sign in here: <a href="${siteUrl}">${siteUrl}</a></p>` : ""}
+        <p>If you did not expect this, please contact your administrator.</p>
+      </div>
+    `;
+
+    await transporter.sendMail({
+      from: smtpUser,
+      to: args.email,
+      subject: "Your staff account is ready",
+      html,
+    });
+
+    return null;
+  },
+});
