@@ -41,6 +41,7 @@ type MessageInputProps = {
   onMessageSent: () => void;
   onOptimisticMessage: (message: OptimisticMessage) => void;
   onUploadProgress: (progress: Record<string, number>) => void;
+  onOptimisticFailed: (optimisticId: string) => void;
 };
 
 const MessageInput = memo(
@@ -54,6 +55,7 @@ const MessageInput = memo(
     onMessageSent,
     onOptimisticMessage,
     onUploadProgress,
+    onOptimisticFailed,
   }: MessageInputProps) => {
     const [message, setMessage] = useState("");
     const [files, setFiles] = useState<Array<File>>([]);
@@ -168,13 +170,18 @@ const MessageInput = memo(
           }
 
           // Send message with attachments
-          await sendMessageMutation({
+          const result = await sendMessageMutation({
             orderId: orderId as Id<"orders">,
             chatId,
             content: optimistic.content,
             attachmentFileIds:
               attachmentFileIds.length > 0 ? attachmentFileIds : undefined,
           });
+
+          if ((result as any)?.error) {
+            // Remove the optimistic message if backend rejected it
+            onOptimisticFailed(optimisticId);
+          }
 
           onMessageSent();
         } catch (error) {
@@ -349,6 +356,10 @@ export default function OrderChat({
 
   const handleOptimisticMessage = useCallback((message: OptimisticMessage) => {
     setOptimisticMessages((prev) => [...prev, message]);
+  }, []);
+
+  const handleOptimisticFailed = useCallback((optimisticId: string) => {
+    setOptimisticMessages((prev) => prev.filter((m) => m._id !== optimisticId));
   }, []);
 
   const handleUploadProgress = useCallback(
@@ -596,17 +607,20 @@ export default function OrderChat({
             <div ref={listEndRef} />
           </div>
         </ScrollArea>
-        <MessageInput
-          orderId={orderId}
-          chatId={chatId}
-          canWrite={canWrite}
-          canReadOnly={canReadOnly}
-          currentUserId={currentUserId}
-          session={session}
-          onMessageSent={handleMessageSent}
-          onOptimisticMessage={handleOptimisticMessage}
-          onUploadProgress={handleUploadProgress}
-        />
+        {canWrite ? (
+          <MessageInput
+            orderId={orderId}
+            chatId={chatId}
+            canWrite={canWrite}
+            canReadOnly={canReadOnly}
+            currentUserId={currentUserId}
+            session={session}
+            onMessageSent={handleMessageSent}
+            onOptimisticMessage={handleOptimisticMessage}
+            onUploadProgress={handleUploadProgress}
+            onOptimisticFailed={handleOptimisticFailed}
+          />
+        ) : null}
       </CardContent>
     </Card>
   );

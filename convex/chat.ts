@@ -34,16 +34,22 @@ async function checkWriteAccess(
   // Reseller member who created the order has access
   if (order.createdByUserId === userId) return true;
 
-  // Reseller member or admin from the team the order belongs to has access
-  if (user.role !== "staff" && user.role !== "owner") {
+  // Explicit write access list on the order
+  if (order.writeAccessUserIds?.includes(userId)) return true;
+
+  // Reseller admin of the same team also has access
+  if (user.role === "reseller") {
     const membership = await ctx.db
       .query("resellerMembers")
       .withIndex("by_user", (q: any) => q.eq("userId", userId))
       .filter((q: any) => q.eq(q.field("teamId"), order.teamId))
       .first();
-
-    if (membership && membership.isActive && !membership.isBlocked) {
-      // Both admin and regular members have access if they're active
+    if (
+      membership &&
+      membership.isActive &&
+      !membership.isBlocked &&
+      membership.role === "admin"
+    ) {
       return true;
     }
   }
@@ -139,14 +145,19 @@ export const sendMessage = mutation({
     content: v.optional(v.string()),
     attachmentFileIds: v.optional(v.array(v.id("files"))),
   },
-  returns: v.object({ messageId: v.id("messages") }),
+  returns: v.union(
+    v.object({ messageId: v.id("messages") }),
+    v.object({ error: v.string() }),
+  ),
   handler: async (ctx, args) => {
     const { userId } = await requireViewer(ctx);
 
     // Verify the order exists and user has write access
     const hasWriteAccess = await checkWriteAccess(ctx, userId, args.orderId);
     if (!hasWriteAccess) {
-      throw new Error("Not authorized to write to this chat");
+      return {
+        error: "You don't have permission to write to this chat",
+      } as any;
     }
 
     // Verify the chat exists and belongs to the order
@@ -193,7 +204,7 @@ export const sendMessage = mutation({
       );
     }
 
-    return { messageId };
+    return { messageId } as any;
   },
 });
 

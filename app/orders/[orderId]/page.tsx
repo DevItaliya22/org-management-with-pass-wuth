@@ -61,6 +61,13 @@ export default function OrderDetailsPage() {
     api.orders.getOrderById,
     orderId ? ({ orderId } as any) : "skip",
   );
+  const session = useQuery(api.session.getCurrentUserSession, {});
+  const currentUserId = session?.user?._id as string | undefined;
+  const currentUserRole = session?.user?.role as
+    | "owner"
+    | "staff"
+    | "reseller"
+    | undefined;
   const disputes = useQuery(
     api.orders.getDisputesByOrder,
     orderId ? ({ orderId } as any) : "skip",
@@ -79,6 +86,17 @@ export default function OrderDetailsPage() {
     api.orders.getUserTeamRoles,
     order && disputeUserIds.length
       ? ({ teamId: order.teamId, userIds: disputeUserIds } as any)
+      : ("skip" as any),
+  );
+
+  // Determine if current user is reseller admin of the order's team
+  const myTeamRole = useQuery(
+    api.orders.getUserTeamRoles,
+    order && currentUserId && currentUserRole === "reseller"
+      ? ({
+          teamId: order.teamId as any,
+          userIds: [currentUserId] as any,
+        } as any)
       : ("skip" as any),
   );
 
@@ -225,15 +243,38 @@ export default function OrderDetailsPage() {
 
   if (!ready || order === undefined) return <div className="p-4">Loading…</div>;
   if (!allowed) return notFound();
-  if (order === null)
-    return <div className="p-4">Order not found or not authorized</div>;
+  if (order === null) {
+    // If the user isn't authorized to view this order or it doesn't exist,
+    // redirect them back to the orders listing instead of showing a Next.js error.
+    if (typeof window !== "undefined") {
+      router.replace("/orders");
+    }
+    return null;
+  }
 
-  const canWriteToChat = !!(
-    isOwner ||
-    isReseller ||
-    isStaff ||
-    isResellerAdmin
-  );
+  // Compute precise write permission to align with backend
+  const canWriteToChat = (() => {
+    if (!order || !currentUserId) return false;
+    if (currentUserRole === "owner") return true;
+    if (
+      currentUserRole === "staff" &&
+      order.pickedByStaffUserId === currentUserId
+    )
+      return true;
+    if (order.createdByUserId === currentUserId) return true;
+    if (
+      Array.isArray(order.writeAccessUserIds) &&
+      (order.writeAccessUserIds as any).includes(currentUserId as any)
+    )
+      return true;
+    if (
+      currentUserRole === "reseller" &&
+      myTeamRole &&
+      myTeamRole[currentUserId] === "admin"
+    )
+      return true;
+    return false;
+  })();
 
   return (
     <DashboardLayout>
