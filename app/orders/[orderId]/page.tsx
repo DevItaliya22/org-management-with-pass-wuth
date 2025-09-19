@@ -485,6 +485,20 @@ export default function OrderDetailsPage() {
               <CardTitle>Order from {order.merchant}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-6">
+              {(isOwner || isResellerAdmin) && orderId && (
+                <div className="space-y-2">
+                  <h3 className="font-medium text-sm">Access Permissions</h3>
+                  <div className="flex flex-wrap items-center gap-2">
+                    {isOwner && (
+                      <OwnerPermissions orderId={orderId} order={order} />
+                    )}
+                    {isResellerAdmin && (
+                      <ResellerAdminPermissions orderId={orderId} order={order} />
+                    )}
+                  </div>
+                  <Separator />
+                </div>
+              )}
               <section className="space-y-2">
                 <h3 className="font-medium text-sm">Customer</h3>
                 <div className="grid grid-cols-3 gap-2 text-sm">
@@ -532,14 +546,7 @@ export default function OrderDetailsPage() {
                       </span>
                     </>
                   )}
-                  {order.status === "cancelled" && order.autoCancelAt && (
-                    <>
-                      <span className="text-muted-foreground">Auto-cancelled At</span>
-                      <span className="col-span-2 text-sm text-muted-foreground">
-                        {new Date(order.autoCancelAt).toLocaleString()}
-                      </span>
-                    </>
-                  )}
+                  
                   {order.status === "on_hold" && order.holdReason && (
                     <>
                       <span className="text-muted-foreground">Hold Reason</span>
@@ -770,13 +777,7 @@ export default function OrderDetailsPage() {
                 </>
               )}
 
-              {/* Conditional Permission Components Based on Role */}
-              {isOwner && orderId && (
-                <OwnerPermissions orderId={orderId} order={order} />
-              )}
-              {isResellerAdmin && orderId && (
-                <ResellerAdminPermissions orderId={orderId} order={order} />
-              )}
+              
             </CardContent>
           </Card>
           {/* Chat */}

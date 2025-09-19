@@ -5,9 +5,15 @@ import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 interface OwnerPermissionsProps {
   orderId: string;
@@ -26,6 +32,8 @@ export default function OwnerPermissions({
   const [selectedReadUsers, setSelectedReadUsers] = useState<string[]>([]);
   const [selectedWriteUsers, setSelectedWriteUsers] = useState<string[]>([]);
   const [savingPermissions, setSavingPermissions] = useState(false);
+  const [initialReadUsers, setInitialReadUsers] = useState<string[]>([]);
+  const [initialWriteUsers, setInitialWriteUsers] = useState<string[]>([]);
 
   // Owner-side: only staff and owners (non-reseller users)
   const members = useQuery(api.orders.getOwnerSideMembersForPermissions, {
@@ -35,14 +43,29 @@ export default function OwnerPermissions({
   // Initialize selected users when members data loads
   useEffect(() => {
     if (members) {
-      setSelectedReadUsers(
-        members.filter((m: any) => m.hasReadAccess).map((m: any) => m._id),
-      );
-      setSelectedWriteUsers(
-        members.filter((m: any) => m.hasWriteAccess).map((m: any) => m._id),
-      );
+      const read = members
+        .filter((m: any) => m.hasReadAccess)
+        .map((m: any) => m._id);
+      const write = members
+        .filter((m: any) => m.hasWriteAccess)
+        .map((m: any) => m._id);
+      setSelectedReadUsers(read);
+      setSelectedWriteUsers(write);
+      setInitialReadUsers(read);
+      setInitialWriteUsers(write);
     }
   }, [members]);
+
+  const arraysEqualAsSet = (a: Array<string>, b: Array<string>) => {
+    if (a.length !== b.length) return false;
+    const setB = new Set(b);
+    for (const v of a) if (!setB.has(v)) return false;
+    return true;
+  };
+
+  const isDirty =
+    !arraysEqualAsSet(selectedReadUsers, initialReadUsers) ||
+    !arraysEqualAsSet(selectedWriteUsers, initialWriteUsers);
 
   const handleSavePermissions = async () => {
     try {
@@ -69,109 +92,81 @@ export default function OwnerPermissions({
 
   return (
     <>
-      <Separator />
-      <section className="space-y-4">
-        <h3 className="font-medium text-sm">
-          Team Access Permissions (Owner View)
-        </h3>
-
-        {/* Read Access */}
-        <div className="space-y-2">
-          <label className="text-sm font-medium">Read Access</label>
-          <div className="space-y-2">
+      <div className="flex flex-wrap items-center gap-2">
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" size="sm">
+              Read Access
+              {selectedReadUsers.length > 0 && (
+                <Badge className="ml-2" variant="secondary">
+                  {selectedReadUsers.length}
+                </Badge>
+              )}
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start" className="w-64 max-h-80 overflow-auto">
+            <DropdownMenuLabel>Select readers</DropdownMenuLabel>
+            <DropdownMenuSeparator />
             {members.map((member: any) => (
-              <div
+              <DropdownMenuCheckboxItem
                 key={`read-${member._id}`}
-                className="flex items-center space-x-2"
+                checked={selectedReadUsers.includes(member._id)}
+                onCheckedChange={(checked) => {
+                  if (checked) {
+                    setSelectedReadUsers((prev) => [...prev, member._id]);
+                  } else {
+                    setSelectedReadUsers((prev) => prev.filter((id) => id !== member._id));
+                  }
+                }}
               >
-                <Checkbox
-                  id={`read-${member._id}`}
-                  checked={selectedReadUsers.includes(member._id)}
-                  onCheckedChange={(checked) => {
-                    if (checked) {
-                      setSelectedReadUsers((prev) => [...prev, member._id]);
-                    } else {
-                      setSelectedReadUsers((prev) =>
-                        prev.filter((id) => id !== member._id),
-                      );
-                    }
-                  }}
-                />
-                <label
-                  htmlFor={`read-${member._id}`}
-                  className="text-sm cursor-pointer flex items-center gap-2"
-                >
-                  {member.name || member.email}
-                  <Badge
-                    variant={member.role === "owner" ? "default" : "secondary"}
-                  >
-                    {member.role}
-                  </Badge>
-                </label>
-              </div>
+                <span className="truncate">{member.name || member.email}</span>
+                <Badge className="ml-2" variant={member.role === "owner" ? "default" : "secondary"}>
+                  {member.role}
+                </Badge>
+              </DropdownMenuCheckboxItem>
             ))}
-          </div>
-          {selectedReadUsers.length > 0 && (
-            <div className="text-xs text-muted-foreground">
-              {selectedReadUsers.length} member
-              {selectedReadUsers.length !== 1 ? "s" : ""} selected
-            </div>
-          )}
-        </div>
+          </DropdownMenuContent>
+        </DropdownMenu>
 
-        {/* Write Access */}
-        <div className="space-y-2">
-          <label className="text-sm font-medium">Write Access</label>
-          <div className="space-y-2">
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" size="sm">
+              Write Access
+              {selectedWriteUsers.length > 0 && (
+                <Badge className="ml-2" variant="secondary">
+                  {selectedWriteUsers.length}
+                </Badge>
+              )}
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start" className="w-64 max-h-80 overflow-auto">
+            <DropdownMenuLabel>Select writers</DropdownMenuLabel>
+            <DropdownMenuSeparator />
             {members.map((member: any) => (
-              <div
+              <DropdownMenuCheckboxItem
                 key={`write-${member._id}`}
-                className="flex items-center space-x-2"
+                checked={selectedWriteUsers.includes(member._id)}
+                onCheckedChange={(checked) => {
+                  if (checked) {
+                    setSelectedWriteUsers((prev) => [...prev, member._id]);
+                  } else {
+                    setSelectedWriteUsers((prev) => prev.filter((id) => id !== member._id));
+                  }
+                }}
               >
-                <Checkbox
-                  id={`write-${member._id}`}
-                  checked={selectedWriteUsers.includes(member._id)}
-                  onCheckedChange={(checked) => {
-                    if (checked) {
-                      setSelectedWriteUsers((prev) => [...prev, member._id]);
-                    } else {
-                      setSelectedWriteUsers((prev) =>
-                        prev.filter((id) => id !== member._id),
-                      );
-                    }
-                  }}
-                />
-                <label
-                  htmlFor={`write-${member._id}`}
-                  className="text-sm cursor-pointer flex items-center gap-2"
-                >
-                  {member.name || member.email}
-                  <Badge
-                    variant={member.role === "owner" ? "default" : "secondary"}
-                  >
-                    {member.role}
-                  </Badge>
-                </label>
-              </div>
+                <span className="truncate">{member.name || member.email}</span>
+                <Badge className="ml-2" variant={member.role === "owner" ? "default" : "secondary"}>
+                  {member.role}
+                </Badge>
+              </DropdownMenuCheckboxItem>
             ))}
-          </div>
-          {selectedWriteUsers.length > 0 && (
-            <div className="text-xs text-muted-foreground">
-              {selectedWriteUsers.length} member
-              {selectedWriteUsers.length !== 1 ? "s" : ""} selected
-            </div>
-          )}
-        </div>
+          </DropdownMenuContent>
+        </DropdownMenu>
 
-        {/* Save Button */}
-        <Button
-          onClick={handleSavePermissions}
-          disabled={savingPermissions}
-          size="sm"
-        >
-          {savingPermissions ? "Saving..." : "Save Permissions"}
+        <Button onClick={handleSavePermissions} disabled={savingPermissions || !isDirty} size="sm">
+          {savingPermissions ? "Saving..." : "Save"}
         </Button>
-      </section>
+      </div>
     </>
   );
 }
