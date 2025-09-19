@@ -16,7 +16,11 @@ export const autoCancelStaleOrders = internalMutation({
     for (const o of candidates) {
       if (o.pickedByStaffUserId) continue;
       if (o.createdAt <= cutoff) {
-        await ctx.db.patch(o._id, { status: "cancelled", updatedAt: now });
+        await ctx.db.patch(o._id, {
+          status: "cancelled",
+          updatedAt: now,
+          autoCancelAt: now,
+        });
         await ctx.db.insert("auditLogs", {
           actorUserId: o.createdByUserId,
           entity: "order",

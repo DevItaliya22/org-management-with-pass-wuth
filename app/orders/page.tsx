@@ -70,26 +70,33 @@ export default function OrdersPage() {
                         className={
                           "text-xs px-2 py-0.5 rounded border " +
                           (o.status === "submitted"
-                            ? "bg-blue-50 text-blue-700 border-blue-200"
+                            ? "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950 dark:text-blue-200 dark:border-blue-900"
                             : o.status === "picked"
-                              ? "bg-amber-50 text-amber-700 border-amber-200"
+                              ? "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950 dark:text-amber-200 dark:border-amber-900"
                               : o.status === "in_progress"
-                                ? "bg-violet-50 text-violet-700 border-violet-200"
+                                ? "bg-violet-50 text-violet-700 border-violet-200 dark:bg-violet-950 dark:text-violet-200 dark:border-violet-900"
                                 : o.status === "on_hold"
-                                  ? "bg-orange-50 text-orange-700 border-orange-200"
+                                  ? "bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-950 dark:text-orange-200 dark:border-orange-900"
                                   : o.status === "fulfil_submitted"
-                                    ? "bg-cyan-50 text-cyan-700 border-cyan-200"
+                                    ? "bg-cyan-50 text-cyan-700 border-cyan-200 dark:bg-cyan-950 dark:text-cyan-200 dark:border-cyan-900"
                                     : o.status === "completed"
-                                      ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                                      ? "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950 dark:text-emerald-200 dark:border-emerald-900"
                                       : o.status === "disputed"
-                                        ? "bg-rose-50 text-rose-700 border-rose-200"
+                                        ? "bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950 dark:text-rose-200 dark:border-rose-900"
                                         : o.status === "cancelled"
-                                          ? "bg-gray-100 text-gray-700 border-gray-200"
+                                          ? "bg-gray-100 text-gray-700 border-gray-200 dark:bg-gray-900 dark:text-gray-200 dark:border-gray-800"
                                           : "")
                         }
                       >
                         {o.status}
                       </span>
+                      {o.status === "cancelled" && (
+                        <div className="text-[11px] text-muted-foreground mt-1">
+                          {o.autoCancelAt
+                            ? `Auto-cancelled at ${new Date(o.autoCancelAt).toLocaleString()}`
+                            : "Cancelled (all staff passed)"}
+                        </div>
+                      )}
                       {isResellerAdmin && (
                         <div className="text-[11px] text-muted-foreground mt-1">
                           by{" "}

@@ -522,6 +522,24 @@ export default function OrderDetailsPage() {
                   <span className="col-span-2">{order.sla}</span>
                   <span className="text-muted-foreground">Status</span>
                   <span className="col-span-2 font-medium">{order.status}</span>
+                  {order.status === "cancelled" && (
+                    <>
+                      <span className="text-muted-foreground">Cancellation</span>
+                      <span className="col-span-2 text-sm text-muted-foreground">
+                        {order.autoCancelAt
+                          ? `Auto-cancelled at ${new Date(order.autoCancelAt).toLocaleString()}`
+                          : "Cancelled (all staff passed)"}
+                      </span>
+                    </>
+                  )}
+                  {order.status === "cancelled" && order.autoCancelAt && (
+                    <>
+                      <span className="text-muted-foreground">Auto-cancelled At</span>
+                      <span className="col-span-2 text-sm text-muted-foreground">
+                        {new Date(order.autoCancelAt).toLocaleString()}
+                      </span>
+                    </>
+                  )}
                   {order.status === "on_hold" && order.holdReason && (
                     <>
                       <span className="text-muted-foreground">Hold Reason</span>
