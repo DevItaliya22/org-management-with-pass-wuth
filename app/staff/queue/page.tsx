@@ -4,6 +4,7 @@ import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { useRole } from "@/hooks/use-role";
 import { Button } from "@/components/ui/button";
+import FulfilmentSubmitDialog from "./FulfilmentSubmitDialog";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -84,9 +85,13 @@ export default function StaffQueuePage() {
   const [merchantLink, setMerchantLink] = useState("");
   const [nameOnOrder, setNameOnOrder] = useState("");
   const [finalValueUsd, setFinalValueUsd] = useState("");
+  const [fulfilDialogOpen, setFulfilDialogOpen] = useState(false);
+  const [fulfilOrderId, setFulfilOrderId] = useState<string | null>(null);
   const [passOpen, setPassOpen] = useState(false);
   const [passReason, setPassReason] = useState("");
-  const [dialogContext, setDialogContext] = useState<"general" | "listStart">("general");
+  const [dialogContext, setDialogContext] = useState<"general" | "listStart">(
+    "general",
+  );
 
   useEffect(() => {
     if (isMobile) setView("list");
@@ -522,7 +527,9 @@ export default function StaffQueuePage() {
               <AlertDialogTitle>Confirm move</AlertDialogTitle>
               <AlertDialogDescription>
                 {pendingMove
-                  ? dialogContext === "listStart" && pendingMove.from === "queue" && pendingMove.to === "in_progress"
+                  ? dialogContext === "listStart" &&
+                    pendingMove.from === "queue" &&
+                    pendingMove.to === "in_progress"
                     ? "Start working on this order?"
                     : `Move order from "${columns.find((c) => c.id === pendingMove.from)?.name}" to "${columns.find((c) => c.id === pendingMove.to)?.name}"`
                   : ""}
@@ -538,30 +545,10 @@ export default function StaffQueuePage() {
                 </div>
               )}
               {pendingMove?.to === "fulfil_submitted" && (
-                <div className="mt-3 grid grid-cols-1 gap-3">
-                  <div className="space-y-2">
-                    <Label>Merchant Link</Label>
-                    <Input
-                      value={merchantLink}
-                      onChange={(e) => setMerchantLink(e.target.value)}
-                      placeholder="https://merchant.com/order"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Name on Order</Label>
-                    <Input
-                      value={nameOnOrder}
-                      onChange={(e) => setNameOnOrder(e.target.value)}
-                      placeholder="Exact name"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Final Value Charged (USD)</Label>
-                    <Input
-                      value={finalValueUsd}
-                      onChange={(e) => setFinalValueUsd(e.target.value)}
-                      placeholder="e.g. 120"
-                    />
+                <div className="mt-3">
+                  <div className="text-sm text-muted-foreground">
+                    You will be asked to fill fulfilment details and upload
+                    proof files in the next step.
                   </div>
                 </div>
               )}
@@ -570,17 +557,19 @@ export default function StaffQueuePage() {
               <AlertDialogCancel onClick={() => setPendingMove(null)}>
                 Cancel
               </AlertDialogCancel>
-              {dialogContext === "general" && pendingMove?.from === "queue" && pendingMove?.to === "in_progress" && (
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    setConfirmOpen(false);
-                    setPassOpen(true);
-                  }}
-                >
-                  Pass
-                </Button>
-              )}
+              {dialogContext === "general" &&
+                pendingMove?.from === "queue" &&
+                pendingMove?.to === "in_progress" && (
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setConfirmOpen(false);
+                      setPassOpen(true);
+                    }}
+                  >
+                    Pass
+                  </Button>
+                )}
               <AlertDialogAction
                 onClick={async () => {
                   if (!pendingMove) return;
@@ -663,6 +652,11 @@ export default function StaffQueuePage() {
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
+        <FulfilmentSubmitDialog
+          orderId={fulfilOrderId}
+          open={fulfilDialogOpen}
+          onOpenChange={(o) => setFulfilDialogOpen(o)}
+        />
         {/* Pass-only modal */}
         <AlertDialog
           open={passOpen}

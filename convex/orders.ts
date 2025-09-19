@@ -1338,7 +1338,7 @@ export const fixAndCompleteDispute = mutation({
     if (dispute.status !== "open") throw new Error("Dispute is not open");
 
     const now = Date.now();
-    
+
     // Update dispute status to approved (fixed & completed)
     await ctx.db.patch(args.disputeId, {
       status: "approved",
@@ -1356,9 +1356,9 @@ export const fixAndCompleteDispute = mutation({
 
     // If no other open disputes, update order status back to completed
     if (otherOpenDisputes.length === 0) {
-      await ctx.db.patch(dispute.orderId, { 
-        status: "completed", 
-        updatedAt: now 
+      await ctx.db.patch(dispute.orderId, {
+        status: "completed",
+        updatedAt: now,
       });
     }
 
@@ -1368,9 +1368,9 @@ export const fixAndCompleteDispute = mutation({
       entity: "dispute",
       entityId: String(args.disputeId),
       action: "dispute_fixed_and_completed",
-      metadata: { 
+      metadata: {
         orderId: dispute.orderId,
-        resolutionNotes: args.resolutionNotes 
+        resolutionNotes: args.resolutionNotes,
       },
       orderId: dispute.orderId,
       createdAt: now,
@@ -1395,7 +1395,7 @@ export const declineAndCompleteDispute = mutation({
     if (dispute.status !== "open") throw new Error("Dispute is not open");
 
     const now = Date.now();
-    
+
     // Update dispute status to declined & completed
     await ctx.db.patch(args.disputeId, {
       status: "declined",
@@ -1413,9 +1413,9 @@ export const declineAndCompleteDispute = mutation({
 
     // If no other open disputes, update order status back to completed
     if (otherOpenDisputes.length === 0) {
-      await ctx.db.patch(dispute.orderId, { 
-        status: "completed", 
-        updatedAt: now 
+      await ctx.db.patch(dispute.orderId, {
+        status: "completed",
+        updatedAt: now,
       });
     }
 
@@ -1425,9 +1425,9 @@ export const declineAndCompleteDispute = mutation({
       entity: "dispute",
       entityId: String(args.disputeId),
       action: "dispute_declined_and_completed",
-      metadata: { 
+      metadata: {
         orderId: dispute.orderId,
-        resolutionNotes: args.resolutionNotes 
+        resolutionNotes: args.resolutionNotes,
       },
       orderId: dispute.orderId,
       createdAt: now,
@@ -1447,14 +1447,15 @@ export const partialRefundAndCompleteDispute = mutation({
   handler: async (ctx, args) => {
     const { userId, user } = await requireViewer(ctx);
     if (user.role !== "owner") throw new Error("Not authorized");
-    if (args.adjustmentAmountUsd <= 0) throw new Error("Adjustment amount must be positive");
+    if (args.adjustmentAmountUsd <= 0)
+      throw new Error("Adjustment amount must be positive");
 
     const dispute = await ctx.db.get(args.disputeId);
     if (!dispute) throw new Error("Dispute not found");
     if (dispute.status !== "open") throw new Error("Dispute is not open");
 
     const now = Date.now();
-    
+
     // Update dispute status to partial_refund with adjustment
     await ctx.db.patch(args.disputeId, {
       status: "partial_refund",
@@ -1487,9 +1488,9 @@ export const partialRefundAndCompleteDispute = mutation({
 
     // If no other open disputes, update order status back to completed
     if (otherOpenDisputes.length === 0) {
-      await ctx.db.patch(dispute.orderId, { 
-        status: "completed", 
-        updatedAt: now 
+      await ctx.db.patch(dispute.orderId, {
+        status: "completed",
+        updatedAt: now,
       });
     }
 
@@ -1499,10 +1500,10 @@ export const partialRefundAndCompleteDispute = mutation({
       entity: "dispute",
       entityId: String(args.disputeId),
       action: "dispute_partial_refund_and_completed",
-      metadata: { 
+      metadata: {
         orderId: dispute.orderId,
         adjustmentAmountUsd: args.adjustmentAmountUsd,
-        resolutionNotes: args.resolutionNotes 
+        resolutionNotes: args.resolutionNotes,
       },
       orderId: dispute.orderId,
       createdAt: now,
