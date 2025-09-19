@@ -26,6 +26,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { X, Upload, File, ChevronDown, AlertTriangle } from "lucide-react";
+import Image from "next/image";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -850,13 +851,15 @@ function AttachmentFile({ fileId }: { fileId: string }) {
       {isImage(file.uiName) && showImage && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-90">
           <div className="relative max-w-[90vw] max-h-[90vh]">
-            <img
+            <Image
               src={file.url}
               alt={file.uiName}
-              className="max-w-full max-h-full object-contain rounded-lg"
-              onError={(e) => {
+              fill
+              sizes="90vw"
+              unoptimized
+              className="object-contain rounded-lg"
+              onError={() => {
                 console.error("Failed to load image:", file.url);
-                e.currentTarget.style.display = "none";
               }}
             />
             <Button

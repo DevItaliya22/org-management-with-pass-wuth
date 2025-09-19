@@ -45,23 +45,23 @@ export default function ResellerAdminPermissions({
     if (teamMembers) {
       const creatorId = order?.createdByUserId as string | undefined;
 
-      const defaultReadIds = teamMembers
+      const defaultReadIds: string[] = teamMembers
         .filter(
           (m: any) =>
             m.hasReadAccess || m.role === "admin" || m._id === creatorId,
         )
-        .map((m: any) => m._id);
+        .map((m: any) => String(m._id));
 
-      const defaultWriteIds = teamMembers
+      const defaultWriteIds: string[] = teamMembers
         .filter(
           (m: any) =>
             m.hasWriteAccess || m.role === "admin" || m._id === creatorId,
         )
-        .map((m: any) => m._id);
+        .map((m: any) => String(m._id));
 
       // Deduplicate
-      const read = Array.from(new Set(defaultReadIds));
-      const write = Array.from(new Set(defaultWriteIds));
+      const read: string[] = Array.from(new Set(defaultReadIds));
+      const write: string[] = Array.from(new Set(defaultWriteIds));
       setSelectedReadUsers(read);
       setSelectedWriteUsers(write);
       setInitialReadUsers(read);

@@ -10,6 +10,7 @@ import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import { X } from "lucide-react";
+import Image from "next/image";
 
 type OrderChatProps = {
   orderId: string;
@@ -199,6 +200,7 @@ const MessageInput = memo(
         currentUserId,
         session,
         onOptimisticMessage,
+        onOptimisticFailed,
         onMessageSent,
         uploadProgress,
         handleUploadProgress,
@@ -410,13 +412,15 @@ export default function OrderChat({
       <>
         {isImage(fileData.uiName) ? (
           <div className="cursor-pointer" onClick={handleClick}>
-            <img
+            <Image
               src={fileData.url}
               alt={fileData.uiName}
+              width={200}
+              height={150}
+              unoptimized
               className="max-w-[200px] max-h-[150px] object-cover rounded-lg border-0 ring-0 outline-none"
-              onError={(e) => {
+              onError={() => {
                 console.error("Failed to load image:", fileData.url);
-                e.currentTarget.style.display = "none";
               }}
             />
           </div>
@@ -438,14 +442,16 @@ export default function OrderChat({
         {/* Image Overlay */}
         {isImage(fileData.uiName) && showImage && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-90">
-            <div className="relative max-w-[90vw] max-h-[90vh]">
-              <img
+            <div className="relative max-w-[90vw] max-h-[90vh] w-[90vw] h-[90vh]">
+              <Image
                 src={fileData.url}
                 alt={fileData.uiName}
-                className="max-w-full max-h-full object-contain rounded-lg"
-                onError={(e) => {
+                fill
+                sizes="90vw"
+                unoptimized
+                className="object-contain rounded-lg"
+                onError={() => {
                   console.error("Failed to load image:", fileData.url);
-                  e.currentTarget.style.display = "none";
                 }}
               />
               <Button
