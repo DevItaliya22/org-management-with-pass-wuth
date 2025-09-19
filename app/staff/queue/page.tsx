@@ -79,7 +79,9 @@ export default function StaffQueuePage() {
   const [finalValueUsd, setFinalValueUsd] = useState("");
   const [passOpen, setPassOpen] = useState(false);
   const [passReason, setPassReason] = useState("");
-  const [dialogContext, setDialogContext] = useState<"general" | "listStart">("general");
+  const [dialogContext, setDialogContext] = useState<"general" | "listStart">(
+    "general",
+  );
 
   useEffect(() => {
     if (isMobile) setView("list");
@@ -186,91 +188,272 @@ export default function StaffQueuePage() {
         </div>
 
         {view === "kanban" ? (
-          <KanbanProvider
-          columns={columns}
-          data={data}
-          className="grid-cols-1 md:grid-cols-4"
-          onDragEnd={async (evt) => {
-            const { active, over } = evt;
-            if (!over) return;
-            const from = data.find((d: any) => d.id === active.id)?.column;
-            const to = columns.find((c) => c.id === (over.id as string))?.id;
-            if (!from || !to || from === to) return;
-            setPendingMove({ id: active.id as string, from, to });
-            setConfirmOpen(true);
-          }}
-        >
-            {(col) => (
-              <KanbanBoard id={col.id} key={col.id}>
-                <KanbanHeader>{col.name}</KanbanHeader>
-                <KanbanCards id={col.id}>
-                  {(item: any) => (
-                    <KanbanCard id={item.id} name={item.name} column={col.id}>
+          <div className="h-[80vh]">
+            <KanbanProvider
+              columns={columns}
+              data={data}
+              className="grid-cols-1 md:grid-cols-4 h-full"
+              onDragEnd={async (evt) => {
+                const { active, over } = evt;
+                if (!over) return;
+                const from = data.find((d: any) => d.id === active.id)?.column;
+                const to = columns.find(
+                  (c) => c.id === (over.id as string),
+                )?.id;
+                if (!from || !to || from === to) return;
+                setPendingMove({ id: active.id as string, from, to });
+                setConfirmOpen(true);
+              }}
+            >
+              {(col) => (
+                <KanbanBoard id={col.id} key={col.id} className="min-h-[70vh]">
+                  <KanbanHeader>{col.name}</KanbanHeader>
+                  <KanbanCards id={col.id}>
+                    {(item: any) => (
+                      <KanbanCard id={item.id} name={item.name} column={col.id}>
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="font-medium text-sm truncate">
+                            {item._raw?.merchant}
+                          </div>
+                          <Badge
+                            variant={
+                              col.id === "queue" ? "secondary" : "default"
+                            }
+                          >
+                            ${item._raw?.cartValueUsd}
+                          </Badge>
+                        </div>
+                        <div className="text-xs text-muted-foreground truncate">
+                          {item._raw?.customerName} • {item._raw?.sla}
+                        </div>
+                      </KanbanCard>
+                    )}
+                  </KanbanCards>
+                </KanbanBoard>
+              )}
+            </KanbanProvider>
+          </div>
+        ) : isMobile ? (
+          <div>
+            <Select value={lane} onValueChange={(v) => setLane(v as any)}>
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Select lane" />
+              </SelectTrigger>
+              <SelectContent>
+                {columns.map((c) => (
+                  <SelectItem key={c.id} value={c.id as any}>
+                    {c.name} ({grouped[c.id]?.length ?? 0})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <div className="mt-4 grid gap-3">
+              {(grouped[lane] ?? []).length === 0 && (
+                <div className="text-sm text-muted-foreground">No orders</div>
+              )}
+              {(grouped[lane] ?? []).map((item: any) => (
+                <Card key={item.id} className="p-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="font-medium text-sm truncate">
+                      {item._raw?.merchant}
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="h-7 w-7"
+                        asChild
+                        aria-label="View order"
+                      >
+                        <Link href={`/orders/${item.id}`}>
+                          <Eye className="h-4 w-4" />
+                        </Link>
+                      </Button>
+                      <Badge
+                        variant={lane === "queue" ? "secondary" : "default"}
+                      >
+                        ${item._raw?.cartValueUsd}
+                      </Badge>
+                    </div>
+                  </div>
+                  <div className="text-xs text-muted-foreground mt-1 truncate">
+                    {item._raw?.customerName} • {item._raw?.sla}
+                  </div>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {lane === "queue" && (
+                      <>
+                        <Button
+                          size="sm"
+                          onClick={() => {
+                            setPendingMove({
+                              id: item.id as string,
+                              from: "queue",
+                              to: "in_progress",
+                            });
+                            setConfirmOpen(true);
+                            setDialogContext("listStart");
+                          }}
+                        >
+                          Start
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          onClick={() => {
+                            setPendingMove({
+                              id: item.id as string,
+                              from: "queue",
+                              to: "on_hold",
+                            });
+                            setConfirmOpen(true);
+                          }}
+                        >
+                          Hold
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
+                            setPendingMove({
+                              id: item.id as string,
+                              from: "queue",
+                              to: "in_progress",
+                            });
+                            setPassOpen(true);
+                          }}
+                        >
+                          Pass
+                        </Button>
+                      </>
+                    )}
+                    {lane === "in_progress" && (
+                      <>
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          onClick={() => {
+                            setPendingMove({
+                              id: item.id as string,
+                              from: "in_progress",
+                              to: "on_hold",
+                            });
+                            setConfirmOpen(true);
+                          }}
+                        >
+                          Hold
+                        </Button>
+                        <Button
+                          size="sm"
+                          onClick={() => {
+                            setPendingMove({
+                              id: item.id as string,
+                              from: "in_progress",
+                              to: "fulfil_submitted",
+                            });
+                            setConfirmOpen(true);
+                          }}
+                        >
+                          Submit Fulfilment
+                        </Button>
+                      </>
+                    )}
+                    {lane === "on_hold" && (
+                      <>
+                        <Button
+                          size="sm"
+                          onClick={() => {
+                            setPendingMove({
+                              id: item.id as string,
+                              from: "on_hold",
+                              to: "in_progress",
+                            });
+                            setConfirmOpen(true);
+                          }}
+                        >
+                          Resume
+                        </Button>
+                        <Button
+                          size="sm"
+                          onClick={() => {
+                            setPendingMove({
+                              id: item.id as string,
+                              from: "on_hold",
+                              to: "fulfil_submitted",
+                            });
+                            setConfirmOpen(true);
+                          }}
+                        >
+                          Submit Fulfilment
+                        </Button>
+                      </>
+                    )}
+                  </div>
+                </Card>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <Tabs defaultValue="queue">
+            <TabsList className="w-full grid grid-cols-4">
+              {columns.map((c) => (
+                <TabsTrigger key={c.id} value={c.id as any}>
+                  <span className="truncate">{c.name}</span>
+                  <Badge
+                    className="ml-2"
+                    variant={c.id === "queue" ? "secondary" : "outline"}
+                  >
+                    {grouped[c.id]?.length ?? 0}
+                  </Badge>
+                </TabsTrigger>
+              ))}
+            </TabsList>
+            {columns.map((c) => (
+              <TabsContent key={c.id} value={c.id as any}>
+                <div className="mt-4 grid gap-3">
+                  {(grouped[c.id] ?? []).length === 0 && (
+                    <div className="text-sm text-muted-foreground">
+                      No orders
+                    </div>
+                  )}
+                  {(grouped[c.id] ?? []).map((item: any) => (
+                    <Card key={item.id} className="p-3">
                       <div className="flex items-center justify-between gap-2">
                         <div className="font-medium text-sm truncate">
                           {item._raw?.merchant}
                         </div>
-                        <Badge
-                          variant={col.id === "queue" ? "secondary" : "default"}
-                        >
-                          ${item._raw?.cartValueUsd}
-                        </Badge>
+                        <div className="flex items-center gap-1">
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-7 w-7"
+                            asChild
+                            aria-label="View order"
+                          >
+                            <Link href={`/orders/${item.id}`}>
+                              <Eye className="h-4 w-4" />
+                            </Link>
+                          </Button>
+                          <Badge
+                            variant={c.id === "queue" ? "secondary" : "default"}
+                          >
+                            ${item._raw?.cartValueUsd}
+                          </Badge>
+                        </div>
                       </div>
-                      <div className="text-xs text-muted-foreground truncate">
+                      <div className="text-xs text-muted-foreground mt-1 truncate">
                         {item._raw?.customerName} • {item._raw?.sla}
                       </div>
-                    </KanbanCard>
-                  )}
-                </KanbanCards>
-              </KanbanBoard>
-            )}
-          </KanbanProvider>
-        ) : (
-          isMobile ? (
-            <div>
-              <Select value={lane} onValueChange={(v) => setLane(v as any)}>
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Select lane" />
-                </SelectTrigger>
-                <SelectContent>
-                  {columns.map((c) => (
-                    <SelectItem key={c.id} value={c.id as any}>
-                      {c.name} ({grouped[c.id]?.length ?? 0})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <div className="mt-4 grid gap-3">
-                {(grouped[lane] ?? []).length === 0 && (
-                  <div className="text-sm text-muted-foreground">No orders</div>
-                )}
-                {(grouped[lane] ?? []).map((item: any) => (
-                  <Card key={item.id} className="p-3">
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="font-medium text-sm truncate">
-                        {item._raw?.merchant}
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <Button size="icon" variant="ghost" className="h-7 w-7" asChild aria-label="View order">
-                          <Link href={`/orders/${item.id}`}>
-                            <Eye className="h-4 w-4" />
-                          </Link>
-                        </Button>
-                        <Badge variant={lane === "queue" ? "secondary" : "default"}>
-                          ${item._raw?.cartValueUsd}
-                        </Badge>
-                      </div>
-                    </div>
-                    <div className="text-xs text-muted-foreground mt-1 truncate">
-                      {item._raw?.customerName} • {item._raw?.sla}
-                    </div>
-                    <div className="mt-3 flex flex-wrap gap-2">
-                        {lane === "queue" && (
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {c.id === "queue" && (
                           <>
                             <Button
                               size="sm"
                               onClick={() => {
-                                setPendingMove({ id: item.id as string, from: "queue", to: "in_progress" });
+                                setPendingMove({
+                                  id: item.id as string,
+                                  from: "queue",
+                                  to: "in_progress",
+                                });
                                 setConfirmOpen(true);
                                 setDialogContext("listStart");
                               }}
@@ -281,7 +464,11 @@ export default function StaffQueuePage() {
                               size="sm"
                               variant="secondary"
                               onClick={() => {
-                                setPendingMove({ id: item.id as string, from: "queue", to: "on_hold" });
+                                setPendingMove({
+                                  id: item.id as string,
+                                  from: "queue",
+                                  to: "on_hold",
+                                });
                                 setConfirmOpen(true);
                               }}
                             >
@@ -291,7 +478,11 @@ export default function StaffQueuePage() {
                               size="sm"
                               variant="outline"
                               onClick={() => {
-                                setPendingMove({ id: item.id as string, from: "queue", to: "in_progress" });
+                                setPendingMove({
+                                  id: item.id as string,
+                                  from: "queue",
+                                  to: "in_progress",
+                                });
                                 setPassOpen(true);
                               }}
                             >
@@ -299,182 +490,74 @@ export default function StaffQueuePage() {
                             </Button>
                           </>
                         )}
-                      {lane === "in_progress" && (
-                        <>
-                          <Button
-                            size="sm"
-                            variant="secondary"
-                            onClick={() => {
-                              setPendingMove({ id: item.id as string, from: "in_progress", to: "on_hold" });
-                              setConfirmOpen(true);
-                            }}
-                          >
-                            Hold
-                          </Button>
-                          <Button
-                            size="sm"
-                            onClick={() => {
-                              setPendingMove({ id: item.id as string, from: "in_progress", to: "fulfil_submitted" });
-                              setConfirmOpen(true);
-                            }}
-                          >
-                            Submit Fulfilment
-                          </Button>
-                        </>
-                      )}
-                      {lane === "on_hold" && (
-                        <>
-                          <Button
-                            size="sm"
-                            onClick={() => {
-                              setPendingMove({ id: item.id as string, from: "on_hold", to: "in_progress" });
-                              setConfirmOpen(true);
-                            }}
-                          >
-                            Resume
-                          </Button>
-                          <Button
-                            size="sm"
-                            onClick={() => {
-                              setPendingMove({ id: item.id as string, from: "on_hold", to: "fulfil_submitted" });
-                              setConfirmOpen(true);
-                            }}
-                          >
-                            Submit Fulfilment
-                          </Button>
-                        </>
-                      )}
-                    </div>
-                  </Card>
-                ))}
-              </div>
-            </div>
-          ) : (
-            <Tabs defaultValue="queue">
-              <TabsList className="w-full grid grid-cols-4">
-                {columns.map((c) => (
-                  <TabsTrigger key={c.id} value={c.id as any}>
-                    <span className="truncate">{c.name}</span>
-                    <Badge className="ml-2" variant={c.id === "queue" ? "secondary" : "outline"}>
-                      {grouped[c.id]?.length ?? 0}
-                    </Badge>
-                  </TabsTrigger>
-                ))}
-              </TabsList>
-              {columns.map((c) => (
-                <TabsContent key={c.id} value={c.id as any}>
-                  <div className="mt-4 grid gap-3">
-                    {(grouped[c.id] ?? []).length === 0 && (
-                      <div className="text-sm text-muted-foreground">No orders</div>
-                    )}
-                    {(grouped[c.id] ?? []).map((item: any) => (
-                      <Card key={item.id} className="p-3">
-                        <div className="flex items-center justify-between gap-2">
-                          <div className="font-medium text-sm truncate">
-                            {item._raw?.merchant}
-                          </div>
-                          <div className="flex items-center gap-1">
-                            <Button size="icon" variant="ghost" className="h-7 w-7" asChild aria-label="View order">
-                              <Link href={`/orders/${item.id}`}>
-                                <Eye className="h-4 w-4" />
-                              </Link>
+                        {c.id === "in_progress" && (
+                          <>
+                            <Button
+                              size="sm"
+                              variant="secondary"
+                              onClick={() => {
+                                setPendingMove({
+                                  id: item.id as string,
+                                  from: "in_progress",
+                                  to: "on_hold",
+                                });
+                                setConfirmOpen(true);
+                              }}
+                            >
+                              Hold
                             </Button>
-                            <Badge variant={c.id === "queue" ? "secondary" : "default"}>
-                              ${item._raw?.cartValueUsd}
-                            </Badge>
-                          </div>
-                        </div>
-                        <div className="text-xs text-muted-foreground mt-1 truncate">
-                          {item._raw?.customerName} • {item._raw?.sla}
-                        </div>
-                        <div className="mt-3 flex flex-wrap gap-2">
-                          {c.id === "queue" && (
-                            <>
-                              <Button
-                                size="sm"
-                                onClick={() => {
-                                  setPendingMove({ id: item.id as string, from: "queue", to: "in_progress" });
-                                  setConfirmOpen(true);
-                                  setDialogContext("listStart");
-                                }}
-                              >
-                                Start
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="secondary"
-                                onClick={() => {
-                                  setPendingMove({ id: item.id as string, from: "queue", to: "on_hold" });
-                                  setConfirmOpen(true);
-                                }}
-                              >
-                                Hold
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => {
-                                  setPendingMove({ id: item.id as string, from: "queue", to: "in_progress" });
-                                  setPassOpen(true);
-                                }}
-                              >
-                                Pass
-                              </Button>
-                            </>
-                          )}
-                          {c.id === "in_progress" && (
-                            <>
-                              <Button
-                                size="sm"
-                                variant="secondary"
-                                onClick={() => {
-                                  setPendingMove({ id: item.id as string, from: "in_progress", to: "on_hold" });
-                                  setConfirmOpen(true);
-                                }}
-                              >
-                                Hold
-                              </Button>
-                              <Button
-                                size="sm"
-                                onClick={() => {
-                                  setPendingMove({ id: item.id as string, from: "in_progress", to: "fulfil_submitted" });
-                                  setConfirmOpen(true);
-                                }}
-                              >
-                                Submit Fulfilment
-                              </Button>
-                            </>
-                          )}
-                          {c.id === "on_hold" && (
-                            <>
-                              <Button
-                                size="sm"
-                                onClick={() => {
-                                  setPendingMove({ id: item.id as string, from: "on_hold", to: "in_progress" });
-                                  setConfirmOpen(true);
-                                }}
-                              >
-                                Resume
-                              </Button>
-                              <Button
-                                size="sm"
-                                onClick={() => {
-                                  setPendingMove({ id: item.id as string, from: "on_hold", to: "fulfil_submitted" });
-                                  setConfirmOpen(true);
-                                }}
-                              >
-                                Submit Fulfilment
-                              </Button>
-                            </>
-                          )}
-                        </div>
-                      </Card>
-                    ))}
-                  </div>
-                </TabsContent>
-              ))}
-            </Tabs>
-          )
+                            <Button
+                              size="sm"
+                              onClick={() => {
+                                setPendingMove({
+                                  id: item.id as string,
+                                  from: "in_progress",
+                                  to: "fulfil_submitted",
+                                });
+                                setConfirmOpen(true);
+                              }}
+                            >
+                              Submit Fulfilment
+                            </Button>
+                          </>
+                        )}
+                        {c.id === "on_hold" && (
+                          <>
+                            <Button
+                              size="sm"
+                              onClick={() => {
+                                setPendingMove({
+                                  id: item.id as string,
+                                  from: "on_hold",
+                                  to: "in_progress",
+                                });
+                                setConfirmOpen(true);
+                              }}
+                            >
+                              Resume
+                            </Button>
+                            <Button
+                              size="sm"
+                              onClick={() => {
+                                setPendingMove({
+                                  id: item.id as string,
+                                  from: "on_hold",
+                                  to: "fulfil_submitted",
+                                });
+                                setConfirmOpen(true);
+                              }}
+                            >
+                              Submit Fulfilment
+                            </Button>
+                          </>
+                        )}
+                      </div>
+                    </Card>
+                  ))}
+                </div>
+              </TabsContent>
+            ))}
+          </Tabs>
         )}
         <AlertDialog
           open={confirmOpen}
@@ -495,7 +578,9 @@ export default function StaffQueuePage() {
               <AlertDialogTitle>Confirm move</AlertDialogTitle>
               <AlertDialogDescription>
                 {pendingMove
-                  ? dialogContext === "listStart" && pendingMove.from === "queue" && pendingMove.to === "in_progress"
+                  ? dialogContext === "listStart" &&
+                    pendingMove.from === "queue" &&
+                    pendingMove.to === "in_progress"
                     ? "Start working on this order?"
                     : `Move order from "${columns.find((c) => c.id === pendingMove.from)?.name}" to "${columns.find((c) => c.id === pendingMove.to)?.name}"`
                   : ""}
@@ -543,17 +628,19 @@ export default function StaffQueuePage() {
               <AlertDialogCancel onClick={() => setPendingMove(null)}>
                 Cancel
               </AlertDialogCancel>
-              {dialogContext === "general" && pendingMove?.from === "queue" && pendingMove?.to === "in_progress" && (
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    setConfirmOpen(false);
-                    setPassOpen(true);
-                  }}
-                >
-                  Pass
-                </Button>
-              )}
+              {dialogContext === "general" &&
+                pendingMove?.from === "queue" &&
+                pendingMove?.to === "in_progress" && (
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setConfirmOpen(false);
+                      setPassOpen(true);
+                    }}
+                  >
+                    Pass
+                  </Button>
+                )}
               <AlertDialogAction
                 onClick={async () => {
                   if (!pendingMove) return;
@@ -667,7 +754,10 @@ export default function StaffQueuePage() {
                 onClick={async () => {
                   try {
                     if (!pendingMove?.id) return;
-                    await pass({ orderId: pendingMove.id as any, reason: passReason.trim() });
+                    await pass({
+                      orderId: pendingMove.id as any,
+                      reason: passReason.trim(),
+                    });
                   } finally {
                     setPassOpen(false);
                     setPassReason("");
