@@ -5,6 +5,26 @@ import { internal } from "./_generated/api";
 
 const http = httpRouter();
 
+// Add CORS handler for all auth routes
+const allowedOrigin = process.env.SITE_URL || "https://cute.mybackends.xyz";
+
+http.route({
+  path: "/auth/*",
+  method: "OPTIONS",
+  handler: httpAction(async (ctx, request) => {
+    return new Response(null, {
+      status: 200,
+      headers: {
+        "Access-Control-Allow-Origin": allowedOrigin,
+        "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type, Authorization",
+        "Access-Control-Allow-Credentials": "true",
+        "Access-Control-Max-Age": "86400",
+      },
+    });
+  }),
+});
+
 auth.addHttpRoutes(http);
 
 http.route({
