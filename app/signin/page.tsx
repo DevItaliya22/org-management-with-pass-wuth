@@ -3,6 +3,7 @@
 import { useAuthActions } from "@convex-dev/auth/react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { toast } from "@/components/ui/sonner";
 
 export default function SignIn() {
   const { signIn } = useAuthActions();
@@ -48,9 +49,10 @@ export default function SignIn() {
                   setError(null);
                   setIsLoading(true);
                   void Promise.resolve(signIn("google"))
-                    .catch((err: any) =>
-                      setError(err?.message || "Google sign-in failed"),
-                    )
+                    .catch((err: any) => {
+                      setError(err?.message || "Google sign-in failed");
+                      toast.error(err?.message || "Google sign-in failed");
+                    })
                     .finally(() => setIsLoading(false));
                 }}
                 className="w-full inline-flex items-center justify-center gap-2 rounded-md border border-slate-200 dark:border-slate-800 px-4 py-2 text-sm font-medium bg-white dark:bg-slate-950 hover:bg-slate-50 dark:hover:bg-slate-900 transition-colors disabled:opacity-50 disabled:pointer-events-none"
@@ -102,15 +104,27 @@ export default function SignIn() {
                   const formData = new FormData(event.currentTarget);
                   formData.set("flow", step);
                   void signIn("password", formData)
-                    .then(() =>
-                      setStep({ email: formData.get("email") as string }),
-                    )
+                    .then(() => {
+                      setStep({ email: formData.get("email") as string });
+                      toast.success(
+                        "Verification code sent. Check your email inbox.",
+                      );
+                    })
                     .catch((err: any) => {
                       if (err && /verify|code|otp/i.test(err.message || "")) {
                         setStep({ email: formData.get("email") as string });
                         setError(null);
+                        toast.success(
+                          "Verification code sent. Check your email inbox.",
+                        );
                       } else {
                         setError(
+                          err?.message ||
+                            (step === "signIn"
+                              ? "Sign in failed"
+                              : "Sign up failed"),
+                        );
+                        toast.error(
                           err?.message ||
                             (step === "signIn"
                               ? "Sign in failed"
@@ -282,10 +296,14 @@ export default function SignIn() {
                   const formData = new FormData(event.currentTarget);
                   formData.set("flow", "email-verification");
                   void signIn("password", formData)
-                    .then(() => router.push("/"))
-                    .catch((err: any) =>
-                      setError(err?.message || "Verification failed"),
-                    )
+                    .then(() => {
+                      toast.success("Signed in successfully");
+                      router.push("/");
+                    })
+                    .catch((err: any) => {
+                      setError(err?.message || "Verification failed");
+                      toast.error(err?.message || "Verification failed");
+                    })
                     .finally(() => setIsLoading(false));
                 }}
               >

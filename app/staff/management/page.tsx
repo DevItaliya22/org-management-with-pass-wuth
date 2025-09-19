@@ -29,6 +29,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Edit, Plus, Loader2, Inbox } from "lucide-react";
 import { Id } from "@/convex/_generated/dataModel";
+import { toast } from "@/components/ui/sonner";
 
 export default function StaffManagementPage() {
   const { isLoading, isOwner } = useRole();
@@ -88,11 +89,13 @@ export default function StaffManagementPage() {
       }
       await createStaff({ email: trimmedEmail, password: trimmedPassword });
       setCreateStatus("Staff created successfully");
+      toast.success("Staff created successfully");
       setEmail("");
       setPassword("");
       setIsCreateModalOpen(false);
     } catch (e: any) {
       setCreateStatus(e?.message ?? "Failed to create staff");
+      toast.error(e?.message ?? "Failed to create staff");
     } finally {
       setIsCreating(false);
     }
@@ -113,8 +116,10 @@ export default function StaffManagementPage() {
       setIsEditModalOpen(false);
       setEditingStaff(null);
       setEditName("");
+      toast.success("Staff name updated");
     } catch (e: any) {
       console.error("Failed to update staff name:", e);
+      toast.error(e?.message ?? "Failed to update staff name");
     } finally {
       setIsUpdating(false);
     }

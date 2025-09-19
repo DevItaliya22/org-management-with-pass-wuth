@@ -16,6 +16,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Inbox } from "lucide-react";
+import { toast } from "@/components/ui/sonner";
 
 export default function TeamRequestsPage() {
   const { isLoading, isResellerDefaultMember, isResellerMember } = useRole();
@@ -88,14 +89,28 @@ export default function TeamRequestsPage() {
                           <Button
                             size="sm"
                             className="bg-green-600 text-white hover:bg-green-600"
-                            onClick={() => accept({ invitationId: i._id })}
+                            onClick={async () => {
+                              try {
+                                await accept({ invitationId: i._id });
+                                toast.success("Invitation accepted");
+                              } catch (e: any) {
+                                toast.error(e?.message ?? "Failed to accept");
+                              }
+                            }}
                           >
                             Accept
                           </Button>
                           <Button
                             size="sm"
                             variant="destructive"
-                            onClick={() => reject({ invitationId: i._id })}
+                            onClick={async () => {
+                              try {
+                                await reject({ invitationId: i._id });
+                                toast.success("Invitation rejected");
+                              } catch (e: any) {
+                                toast.error(e?.message ?? "Failed to reject");
+                              }
+                            }}
                           >
                             Reject
                           </Button>

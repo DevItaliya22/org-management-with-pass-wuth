@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Upload, File, X } from "lucide-react";
+import { toast } from "@/components/ui/sonner";
 
 export default function NewOrderPage() {
   const { session, isLoading, isStaff, isOwner } = useRole();
@@ -45,9 +46,7 @@ export default function NewOrderPage() {
   const [itemsSummary, setItemsSummary] = useState<string>("");
   const [currencyOverride, setCurrencyOverride] = useState<string>("USD");
   const [submitting, setSubmitting] = useState(false);
-  const [msg, setMsg] = useState<string | null>(null);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
-  const [uploadedFileIds, setUploadedFileIds] = useState<string[]>([]);
   const [uploading, setUploading] = useState(false);
   const [redirecting, setRedirecting] = useState(false);
 
@@ -100,6 +99,7 @@ export default function NewOrderPage() {
       }
     } catch (error) {
       console.error("Error uploading files:", error);
+      toast.error("Failed to upload files");
       throw error;
     } finally {
       setUploading(false);
@@ -113,13 +113,12 @@ export default function NewOrderPage() {
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setMsg(null);
     if (!teamId) {
-      setMsg("No team found in session");
+      toast.error("No team found in session");
       return;
     }
     if (!categoryId) {
-      setMsg("Select a category");
+      toast.error("Select a category");
       return;
     }
     try {
@@ -160,12 +159,13 @@ export default function NewOrderPage() {
       try {
         router.prefetch?.(url);
       } catch {}
+      toast.success("Order created");
       setTimeout(() => {
         router.replace(url);
       }, 50);
       return;
     } catch (e: any) {
-      setMsg(e?.message || "Failed to create order");
+      toast.error(e?.message || "Failed to create order");
     } finally {
       if (!redirecting) setSubmitting(false);
     }
@@ -521,8 +521,7 @@ export default function NewOrderPage() {
                         setItemsSummary("");
                         setCurrencyOverride("USD");
                         setSelectedFiles([]);
-                        setUploadedFileIds([]);
-                        setMsg(null);
+                        toast.success("Form reset");
                       }}
                       className="px-6"
                     >
@@ -565,18 +564,6 @@ export default function NewOrderPage() {
                     </Button>
                   </div>
                 </div>
-
-                {msg && (
-                  <div
-                    className={`mt-4 p-4 rounded-lg text-sm ${
-                      msg === "Order created"
-                        ? "bg-green-50 text-green-800 border border-green-200"
-                        : "bg-red-50 text-red-800 border border-red-200"
-                    }`}
-                  >
-                    {msg}
-                  </div>
-                )}
               </div>
             </form>
           </CardContent>

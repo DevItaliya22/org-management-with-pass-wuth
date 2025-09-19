@@ -27,6 +27,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { toast } from "@/components/ui/sonner";
 
 export default function TeamInvitationsPage() {
   const { isLoading, isResellerAdmin, session } = useRole();
@@ -47,9 +48,14 @@ export default function TeamInvitationsPage() {
   const onInvite = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!teamId || !email) return;
-    await invite({ teamId, invitedEmail: email });
-    setEmail("");
-    setInviteOpen(false);
+    try {
+      await invite({ teamId, invitedEmail: email });
+      toast.success("Invitation sent");
+      setEmail("");
+      setInviteOpen(false);
+    } catch (err: any) {
+      toast.error(err?.message ?? "Failed to send invitation");
+    }
   };
 
   const [inviteOpen, setInviteOpen] = useState(false);

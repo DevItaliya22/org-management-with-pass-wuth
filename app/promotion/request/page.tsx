@@ -22,7 +22,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "@/components/ui/sonner";
 import { Button } from "@/components/ui/button";
 import { Inbox } from "lucide-react";
 
@@ -33,7 +33,6 @@ export default function PromotionPage() {
   const [canView, setCanView] = useState<boolean | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
-  const { toast } = useToast();
 
   useEffect(() => {
     if (!isLoading) {
@@ -58,16 +57,10 @@ export default function PromotionPage() {
     try {
       setIsSubmitting(true);
       await requestPromotion({ teamId });
-      toast({
-        title: "Request sent",
-        description: "Your admin promotion request has been submitted.",
-      });
+      toast.success("Request sent");
       setConfirmOpen(false);
     } catch (error) {
-      toast({
-        title: "Failed to send request",
-        description: "Please try again.",
-      });
+      toast.error("Failed to send request");
     } finally {
       setIsSubmitting(false);
     }

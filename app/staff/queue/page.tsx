@@ -125,6 +125,7 @@ export default function StaffQueuePage() {
       if (lane === "queue" && targetLane === "in_progress") {
         await pick({ orderId });
         await start({ orderId });
+        toast.success("Order started");
         return;
       }
       // Prevent direct move from queue -> on_hold. Must go to in_progress first.
@@ -134,14 +135,17 @@ export default function StaffQueuePage() {
       }
       if (lane === "in_progress" && targetLane === "on_hold") {
         await hold({ orderId, reason: "Moved to hold" });
+        toast.success("Order put on hold");
         return;
       }
       if (lane === "on_hold" && targetLane === "in_progress") {
         await resume({ orderId });
+        toast.success("Order resumed");
         return;
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error("Drag drop action failed", err);
+      toast.error(err?.message || "Action failed");
     }
   };
 
@@ -555,6 +559,7 @@ export default function StaffQueuePage() {
                     if (from === "queue" && to === "in_progress") {
                       await pick({ orderId: id as any });
                       await start({ orderId: id as any });
+                      toast.success("Order started");
                     } else if (from === "queue" && (to === "on_hold" || to === "fulfil_submitted")) {
                       // Disallow direct moves from queue to on_hold or fulfil_submitted
                       toast.error("Move to In Progress first");
@@ -565,8 +570,10 @@ export default function StaffQueuePage() {
                         orderId: id as any,
                         reason: holdReason.trim(),
                       });
+                      toast.success("Order put on hold");
                     } else if (from === "on_hold" && to === "in_progress") {
                       await resume({ orderId: id as any });
+                      toast.success("Order resumed");
                     } else if (
                       from === "in_progress" &&
                       to === "fulfil_submitted"
@@ -585,6 +592,7 @@ export default function StaffQueuePage() {
                         finalValueUsd: finalVal,
                         proofFileIds: [],
                       });
+                      toast.success("Fulfilment submitted");
                     } else if (
                       from === "on_hold" &&
                       to === "fulfil_submitted"
@@ -603,7 +611,10 @@ export default function StaffQueuePage() {
                         finalValueUsd: finalVal,
                         proofFileIds: [],
                       });
+                      toast.success("Fulfilment submitted");
                     }
+                  } catch (e: any) {
+                    toast.error(e?.message || "Action failed");
                   } finally {
                     setPendingMove(null);
                     setHoldReason("");
@@ -658,6 +669,9 @@ export default function StaffQueuePage() {
                   try {
                     if (!pendingMove?.id) return;
                     await pass({ orderId: pendingMove.id as any, reason: passReason.trim() });
+                    toast.success("Order passed");
+                  } catch (e: any) {
+                    toast.error(e?.message || "Failed to pass order");
                   } finally {
                     setPassOpen(false);
                     setPassReason("");

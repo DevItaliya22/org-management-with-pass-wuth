@@ -37,12 +37,12 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { Pencil, Inbox } from "lucide-react";
 import { notFound } from "next/navigation";
+import { toast } from "@/components/ui/sonner";
 
 export default function CategoriesPage() {
   const { isLoading, isOwner } = useRole();
   const [name, setName] = useState("");
   const [slug, setSlug] = useState("");
-  const [msg, setMsg] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [pendingToggle, setPendingToggle] = useState<{
@@ -65,20 +65,19 @@ export default function CategoriesPage() {
   const onCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      setMsg(null);
       setCreating(true);
       const trimmedName = name.trim();
       const trimmedSlug = slug.trim();
       if (!trimmedName || !trimmedSlug) {
-        setMsg("Name and slug are required");
+        toast.error("Name and slug are required");
         return;
       }
       await createCat({ name: trimmedName, slug: trimmedSlug });
       setName("");
       setSlug("");
-      setMsg("Category created");
+      toast.success("Category created");
     } catch (e: any) {
-      setMsg(e?.message || "Failed to create category");
+      toast.error(e?.message || "Failed to create category");
     } finally {
       setCreating(false);
     }
@@ -133,11 +132,6 @@ export default function CategoriesPage() {
                       Create
                     </GradientButton>
                   </div>
-                  {msg && (
-                    <div className="md:col-span-3 text-sm text-muted-foreground">
-                      {msg}
-                    </div>
-                  )}
                 </form>
               </DialogContent>
             </Dialog>
@@ -236,13 +230,22 @@ export default function CategoriesPage() {
               <AlertDialogCancel>Cancel</AlertDialogCancel>
               <AlertDialogAction
                 onClick={async () => {
-                  if (pendingToggle) {
-                    await toggleActive({
-                      categoryId: pendingToggle.id as any,
-                      isActive: pendingToggle.next,
-                    });
+                  try {
+                    if (pendingToggle) {
+                      await toggleActive({
+                        categoryId: pendingToggle.id as any,
+                        isActive: pendingToggle.next,
+                      });
+                      toast.success(
+                        pendingToggle.next ? "Category activated" : "Category deactivated",
+                      );
+                    }
+                  } catch (e: any) {
+                    toast.error(e?.message || "Failed to update category");
+                  } finally {
+                    setPendingToggle(null);
+                    setConfirmOpen(false);
                   }
-                  setPendingToggle(null);
                 }}
               >
                 Confirm
@@ -269,17 +272,15 @@ function EditCategoryForm({
   const [name, setName] = useState(initialName);
   const [slug, setSlug] = useState(initialSlug);
   const [saving, setSaving] = useState(false);
-  const [msg, setMsg] = useState<string | null>(null);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setMsg(null);
     try {
       setSaving(true);
       await onSave(name, slug);
-      setMsg("Saved");
+      toast.success("Category updated");
     } catch (e: any) {
-      setMsg(e?.message || "Failed to save");
+      toast.error(e?.message || "Failed to save");
     } finally {
       setSaving(false);
     }
@@ -300,9 +301,6 @@ function EditCategoryForm({
           {saving ? "Saving…" : "Save"}
         </Button>
       </div>
-      {msg && (
-        <div className="md:col-span-3 text-sm text-muted-foreground">{msg}</div>
-      )}
     </form>
   );
 }

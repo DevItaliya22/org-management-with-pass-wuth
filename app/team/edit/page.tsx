@@ -31,6 +31,7 @@ import { Switch } from "@/components/ui/switch";
 import { Edit, Eye, Loader2 } from "lucide-react";
 import { Id } from "@/convex/_generated/dataModel";
 import Link from "next/link";
+import { toast } from "@/components/ui/sonner";
 
 export default function TeamManagementPage() {
   const { isLoading, isResellerAdmin, session } = useRole();
@@ -38,7 +39,6 @@ export default function TeamManagementPage() {
   const team = session?.team;
   const [name, setName] = useState(team?.name ?? "");
   const [slug, setSlug] = useState(team?.slug ?? "");
-  const [msg, setMsg] = useState<string | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
 
@@ -58,10 +58,10 @@ export default function TeamManagementPage() {
     setIsUpdating(true);
     try {
       await updateTeam({ teamId: team._id, name, slug });
-      setMsg("Team updated successfully");
+      toast.success("Team updated successfully");
       setIsEditModalOpen(false);
     } catch (err: any) {
-      setMsg(err?.message ?? "Failed to update team");
+      toast.error(err?.message ?? "Failed to update team");
     } finally {
       setIsUpdating(false);
     }
@@ -77,8 +77,10 @@ export default function TeamManagementPage() {
         memberId,
         [field]: value,
       });
+      toast.success("Member status updated");
     } catch (err: any) {
       console.error("Failed to update member status:", err);
+      toast.error(err?.message ?? "Failed to update member status");
     }
   };
 
@@ -258,12 +260,6 @@ export default function TeamManagementPage() {
             )}
           </CardContent>
         </Card>
-
-        {msg && (
-          <Alert>
-            <AlertDescription>{msg}</AlertDescription>
-          </Alert>
-        )}
       </div>
     </DashboardLayout>
   );

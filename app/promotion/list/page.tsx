@@ -8,6 +8,7 @@ import { useRole } from "@/hooks/use-role";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Inbox } from "lucide-react";
+import { toast } from "@/components/ui/sonner";
 import {
   Table,
   TableBody,
@@ -58,18 +59,28 @@ export default function PromotionRequestsPage() {
                         <Button
                           size="sm"
                           className="bg-green-600 text-white hover:bg-green-600"
-                          onClick={() =>
-                            review({ requestId: r._id, approve: true })
-                          }
+                          onClick={async () => {
+                            try {
+                              await review({ requestId: r._id, approve: true });
+                              toast.success("Promotion request approved");
+                            } catch (e: any) {
+                              toast.error(e?.message ?? "Failed to approve");
+                            }
+                          }}
                         >
                           Approve
                         </Button>
                         <Button
                           size="sm"
                           variant="destructive"
-                          onClick={() =>
-                            review({ requestId: r._id, approve: false })
-                          }
+                          onClick={async () => {
+                            try {
+                              await review({ requestId: r._id, approve: false });
+                              toast.success("Promotion request rejected");
+                            } catch (e: any) {
+                              toast.error(e?.message ?? "Failed to reject");
+                            }
+                          }}
                         >
                           Reject
                         </Button>
