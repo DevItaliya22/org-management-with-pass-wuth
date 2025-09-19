@@ -30,6 +30,7 @@ import { notFound } from "next/navigation";
 import DashboardLayout from "@/components/Dashboard/DashboardLayout";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { cn } from "@/lib/utils";
 import {
   Select,
   SelectContent,
@@ -67,6 +68,11 @@ export default function StaffQueuePage() {
   const hold = useMutation(api.orders.holdOrder);
   const resume = useMutation(api.orders.resumeOrder);
   const submitFulfilment = useMutation(api.orders.submitFulfilment);
+  const myStaff = useQuery(
+    api.staff.getMyStaff,
+    isLoading ? (undefined as any) : ({} as any),
+  );
+  const canAct = myStaff?.status === "online";
 
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [pendingMove, setPendingMove] = useState<{
@@ -106,6 +112,10 @@ export default function StaffQueuePage() {
     targetLane: "queue" | "in_progress" | "on_hold" | "fulfil_submitted",
   ) => {
     e.preventDefault();
+    if (!canAct) {
+      toast.error("You are not online. Switch status to Online to take actions.");
+      return;
+    }
     const raw = e.dataTransfer.getData("text/plain");
     if (!raw) return;
     const { orderId, lane } = JSON.parse(raw || "{}");
@@ -198,6 +208,7 @@ export default function StaffQueuePage() {
         </div>
 
         {view === "kanban" ? (
+          <div className={cn(!canAct && "pointer-events-none opacity-60")}> 
           <KanbanProvider
           columns={columns}
           data={data}
@@ -205,6 +216,10 @@ export default function StaffQueuePage() {
           onDragEnd={async (evt) => {
             const { active, over } = evt;
             if (!over) return;
+            if (!canAct) {
+              toast.error("You are not online. Switch status to Online to take actions.");
+              return;
+            }
             const from = data.find((d: any) => d.id === active.id)?.column;
             const to = columns.find((c) => c.id === (over.id as string))?.id;
             if (!from || !to || from === to) return;
@@ -242,9 +257,10 @@ export default function StaffQueuePage() {
               </KanbanBoard>
             )}
           </KanbanProvider>
+          </div>
         ) : (
           isMobile ? (
-            <div>
+            <div className={cn(!canAct && "pointer-events-none opacity-60")}> 
               <Select value={lane} onValueChange={(v) => setLane(v as any)}>
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="Select lane" />
@@ -282,11 +298,13 @@ export default function StaffQueuePage() {
                       {item._raw?.customerName} • {item._raw?.sla}
                     </div>
                     <div className="mt-3 flex flex-wrap gap-2">
-                        {lane === "queue" && (
+                      {lane === "queue" && (
                           <>
                             <Button
                               size="sm"
+                            disabled={!canAct}
                               onClick={() => {
+                              if (!canAct) { toast.error("You are not online."); return; }
                                 setPendingMove({ id: item.id as string, from: "queue", to: "in_progress" });
                                 setConfirmOpen(true);
                                 setDialogContext("listStart");
@@ -297,7 +315,9 @@ export default function StaffQueuePage() {
                             <Button
                               size="sm"
                               variant="outline"
+                            disabled={!canAct}
                               onClick={() => {
+                              if (!canAct) { toast.error("You are not online."); return; }
                                 setPendingMove({ id: item.id as string, from: "queue", to: "in_progress" });
                                 setPassOpen(true);
                               }}
@@ -311,7 +331,9 @@ export default function StaffQueuePage() {
                           <Button
                             size="sm"
                             variant="secondary"
+                            disabled={!canAct}
                             onClick={() => {
+                              if (!canAct) { toast.error("You are not online."); return; }
                               setPendingMove({ id: item.id as string, from: "in_progress", to: "on_hold" });
                               setConfirmOpen(true);
                             }}
@@ -320,7 +342,9 @@ export default function StaffQueuePage() {
                           </Button>
                           <Button
                             size="sm"
+                            disabled={!canAct}
                             onClick={() => {
+                              if (!canAct) { toast.error("You are not online."); return; }
                               setPendingMove({ id: item.id as string, from: "in_progress", to: "fulfil_submitted" });
                               setConfirmOpen(true);
                             }}
@@ -333,7 +357,9 @@ export default function StaffQueuePage() {
                         <>
                           <Button
                             size="sm"
+                            disabled={!canAct}
                             onClick={() => {
+                              if (!canAct) { toast.error("You are not online."); return; }
                               setPendingMove({ id: item.id as string, from: "on_hold", to: "in_progress" });
                               setConfirmOpen(true);
                             }}
@@ -342,7 +368,9 @@ export default function StaffQueuePage() {
                           </Button>
                           <Button
                             size="sm"
+                            disabled={!canAct}
                             onClick={() => {
+                              if (!canAct) { toast.error("You are not online."); return; }
                               setPendingMove({ id: item.id as string, from: "on_hold", to: "fulfil_submitted" });
                               setConfirmOpen(true);
                             }}
@@ -357,6 +385,7 @@ export default function StaffQueuePage() {
               </div>
             </div>
           ) : (
+            <div className={cn(!canAct && "pointer-events-none opacity-60")}> 
             <Tabs defaultValue="queue">
               <TabsList className="w-full grid grid-cols-4">
                 {columns.map((c) => (
@@ -471,6 +500,7 @@ export default function StaffQueuePage() {
                 </TabsContent>
               ))}
             </Tabs>
+            </div>
           )
         )}
         <AlertDialog
@@ -556,6 +586,10 @@ export default function StaffQueuePage() {
                   if (!pendingMove) return;
                   const { id, from, to } = pendingMove;
                   try {
+                    if (!canAct) {
+                      toast.error("You are not online.");
+                      return;
+                    }
                     if (from === "queue" && to === "in_progress") {
                       await pick({ orderId: id as any });
                       await start({ orderId: id as any });

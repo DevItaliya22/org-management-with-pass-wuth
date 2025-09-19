@@ -80,6 +80,8 @@ export const getAllStaff = query({
         v.literal("offline"),
       ),
       isActive: v.boolean(),
+      capacityHint: v.optional(v.number()),
+      lastPausedAt: v.optional(v.number()),
       createdAt: v.number(),
       updatedAt: v.number(),
       user: v.object({
@@ -150,6 +152,62 @@ export const updateStaffName = mutation({
       await ctx.db.patch(staffRecord._id, { updatedAt: Date.now() });
     }
 
+    return null;
+  },
+});
+
+// Get current viewer's staff record
+export const getMyStaff = query({
+  args: {},
+  returns: v.union(
+    v.object({
+      _creationTime: v.number(),
+      _id: v.id("staff"),
+      userId: v.id("users"),
+      status: v.union(
+        v.literal("online"),
+        v.literal("paused"),
+        v.literal("offline"),
+      ),
+      isActive: v.boolean(),
+      capacityHint: v.optional(v.number()),
+      lastPausedAt: v.optional(v.number()),
+      createdAt: v.number(),
+      updatedAt: v.number(),
+    }),
+    v.null(),
+  ),
+  handler: async (ctx) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+    const staff = await ctx.db
+      .query("staff")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .unique();
+    return staff ?? null;
+  },
+});
+
+// Update current viewer's staff status
+export const updateMyStatus = mutation({
+  args: {
+    status: v.union(v.literal("online"), v.literal("paused"), v.literal("offline")),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+    const staff = await ctx.db
+      .query("staff")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .unique();
+    if (!staff) throw new Error("Staff record not found");
+    const now = Date.now();
+    await ctx.db.patch(staff._id, {
+      status: args.status,
+      lastPausedAt: args.status === "paused" ? now : staff.lastPausedAt,
+      updatedAt: now,
+    });
     return null;
   },
 });
