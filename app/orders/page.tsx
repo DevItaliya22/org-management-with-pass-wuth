@@ -24,10 +24,13 @@ export default function OrdersPage() {
   const page = useQuery(api.orders.listOrdersForViewer, {
     paginationOpts: { numItems: 20, cursor: null },
   });
-  const userIds: string[] = isResellerAdmin
-    ? Array.from(new Set((page?.page ?? []).map((o: any) => o.createdByUserId)))
-    : [];
-  const userLabels = useQuery(api.orders.getUserLabels, { userIds } as any);
+  const userIds: string[] = Array.from(
+    new Set((page?.page ?? []).map((o: any) => o.createdByUserId)),
+  );
+  const userLabels = useQuery(
+    api.orders.getUserLabels,
+    userIds.length ? ({ userIds } as any) : ("skip" as any),
+  );
 
   if (isLoading) return <div className="p-4">Loading…</div>;
   if (page === undefined) return <div className="p-4">Loading…</div>;
@@ -90,17 +93,15 @@ export default function OrdersPage() {
                       >
                         {o.status}
                       </span>
-                      {isResellerAdmin && (
-                        <div className="text-[11px] text-muted-foreground mt-1">
-                          by{" "}
-                          {o.createdByUserId === (session?.user?._id as any)
-                            ? "you"
-                            : userLabels && userLabels[o.createdByUserId]
-                              ? (userLabels[o.createdByUserId].name ??
-                                userLabels[o.createdByUserId].email)
-                              : "member"}
-                        </div>
-                      )}
+                      <div className="text-[11px] text-muted-foreground mt-1">
+                        Created by{" "}
+                        {o.createdByUserId === (session?.user?._id as any)
+                          ? "you"
+                          : userLabels && userLabels[o.createdByUserId]
+                            ? (userLabels[o.createdByUserId].name ??
+                              userLabels[o.createdByUserId].email)
+                            : "member"}
+                      </div>
                     </TableCell>
                     <TableCell>${o.cartValueUsd}</TableCell>
                     <TableCell className="uppercase">{o.sla}</TableCell>

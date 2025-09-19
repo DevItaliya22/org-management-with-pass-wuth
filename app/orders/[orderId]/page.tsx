@@ -32,6 +32,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import RaiseDisputeButton from "./RaiseDisputeButton";
 
 export default function OrderDetailsPage() {
   const {
@@ -92,9 +93,7 @@ export default function OrderDetailsPage() {
   );
 
   const [completing, setCompleting] = useState(false);
-  const [disputeOpen, setDisputeOpen] = useState(false);
-  const [disputeReason, setDisputeReason] = useState("");
-  const [disputeFiles, setDisputeFiles] = useState<File[]>([]);
+  // Dispute raise state moved into RaiseDisputeButton to avoid extra rerenders
   const [disputeActionOpen, setDisputeActionOpen] = useState(false);
   const [selectedDispute, setSelectedDispute] = useState<any>(null);
   const [activeAction, setActiveAction] = useState<
@@ -104,22 +103,7 @@ export default function OrderDetailsPage() {
   const [adjustmentAmount, setAdjustmentAmount] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
-  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(event.target.files || []);
-    setDisputeFiles((prev) => [...prev, ...files]);
-  };
-
-  const removeFile = (index: number) => {
-    setDisputeFiles((prev) => prev.filter((_, i) => i !== index));
-  };
-
-  const formatFileSize = (bytes: number) => {
-    if (bytes === 0) return "0 Bytes";
-    const k = 1024;
-    const sizes = ["Bytes", "KB", "MB", "GB"];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
-  };
+  // Removed dispute file helpers; handled in RaiseDisputeButton
 
   const handleDisputeAction = (
     dispute: any,
@@ -271,127 +255,9 @@ export default function OrderDetailsPage() {
             >
               {completing ? "Completing…" : "Mark Complete"}
             </Button>
-            <Button
-              size="sm"
-              variant="destructive"
-              onClick={() => setDisputeOpen(true)}
-            >
-              Raise Dispute
-            </Button>
+            <RaiseDisputeButton orderId={order._id} />
           </div>
         )}
-        <Dialog open={disputeOpen} onOpenChange={setDisputeOpen}>
-          <DialogContent className="max-w-md">
-            <DialogHeader>
-              <DialogTitle>Raise Dispute</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="dispute-reason" className="text-sm font-medium">
-                  Reason
-                </Label>
-                <Textarea
-                  id="dispute-reason"
-                  value={disputeReason}
-                  onChange={(e) => setDisputeReason(e.target.value)}
-                  placeholder="Describe the issue"
-                  rows={4}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="dispute-files" className="text-sm font-medium">
-                  Attachments (Optional)
-                </Label>
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    <Input
-                      id="dispute-files"
-                      type="file"
-                      multiple
-                      onChange={handleFileSelect}
-                      className="hidden"
-                      accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.gif,.txt"
-                    />
-                    <Label
-                      htmlFor="dispute-files"
-                      className="flex items-center gap-2 px-3 py-2 border border-dashed border-gray-300 rounded-md cursor-pointer hover:bg-gray-50 transition-colors"
-                    >
-                      <Upload className="h-4 w-4" />
-                      <span className="text-sm">Choose files</span>
-                    </Label>
-                  </div>
-
-                  {disputeFiles.length > 0 && (
-                    <div className="space-y-2">
-                      <div className="text-xs text-muted-foreground">
-                        Selected files ({disputeFiles.length}):
-                      </div>
-                      <div className="space-y-1 max-h-32 overflow-y-auto">
-                        {disputeFiles.map((file, index) => (
-                          <div
-                            key={index}
-                            className="flex items-center justify-between p-2 bg-gray-50 rounded-md text-sm"
-                          >
-                            <div className="flex items-center gap-2 min-w-0 flex-1">
-                              <File className="h-4 w-4 text-gray-500 flex-shrink-0" />
-                              <div className="min-w-0 flex-1">
-                                <div className="truncate font-medium">
-                                  {file.name}
-                                </div>
-                                <div className="text-xs text-muted-foreground">
-                                  {formatFileSize(file.size)}
-                                </div>
-                              </div>
-                            </div>
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => removeFile(index)}
-                              className="h-6 w-6 p-0 text-gray-500 hover:text-red-500"
-                            >
-                              <X className="h-3 w-3" />
-                            </Button>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            <DialogFooter>
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setDisputeOpen(false);
-                  setDisputeReason("");
-                  setDisputeFiles([]);
-                }}
-              >
-                Cancel
-              </Button>
-              <Button
-                disabled={!disputeReason.trim()}
-                onClick={async () => {
-                  if (!disputeReason.trim()) return;
-                  await raiseDispute({
-                    orderId: order._id,
-                    reason: disputeReason.trim(),
-                  });
-                  setDisputeOpen(false);
-                  setDisputeReason("");
-                  setDisputeFiles([]);
-                  router.refresh();
-                }}
-              >
-                Submit Dispute
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
 
         {/* Dispute Action Dialog */}
         <Dialog open={disputeActionOpen} onOpenChange={setDisputeActionOpen}>

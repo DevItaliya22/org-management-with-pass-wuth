@@ -522,6 +522,15 @@ export default function OrderChat({
             ) : (
               displayMessages.map((msg) => {
                 const isOwn = currentUserId === msg.senderUserId;
+                const hasText =
+                  !!msg.content && String(msg.content).trim().length > 0;
+                const hasAttachments =
+                  Array.isArray(msg.attachmentFileIds) &&
+                  msg.attachmentFileIds.length > 0;
+                // If the message has neither text nor attachments (e.g., optimistic image upload pre-fileId), skip rendering bubble
+                if (!hasText && !hasAttachments) {
+                  return null;
+                }
                 return (
                   <div
                     key={msg._id}
@@ -544,12 +553,6 @@ export default function OrderChat({
                       </div>
                       <div
                         className={`rounded-md whitespace-pre-wrap break-words ${(() => {
-                          const hasText =
-                            !!msg.content &&
-                            String(msg.content).trim().length > 0;
-                          const hasAttachments =
-                            Array.isArray(msg.attachmentFileIds) &&
-                            msg.attachmentFileIds.length > 0;
                           // If only attachments (e.g., images), make bubble transparent and remove padding
                           if (hasAttachments && !hasText)
                             return "p-0 bg-transparent text-foreground";
