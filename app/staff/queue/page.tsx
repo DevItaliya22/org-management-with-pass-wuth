@@ -4,6 +4,7 @@ import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { useRole } from "@/hooks/use-role";
 import { Button } from "@/components/ui/button";
+import FulfilmentSubmitDialog from "./FulfilmentSubmitDialog";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -77,6 +78,8 @@ export default function StaffQueuePage() {
   const [merchantLink, setMerchantLink] = useState("");
   const [nameOnOrder, setNameOnOrder] = useState("");
   const [finalValueUsd, setFinalValueUsd] = useState("");
+  const [fulfilDialogOpen, setFulfilDialogOpen] = useState(false);
+  const [fulfilOrderId, setFulfilOrderId] = useState<string | null>(null);
   const [passOpen, setPassOpen] = useState(false);
   const [passReason, setPassReason] = useState("");
   const [dialogContext, setDialogContext] = useState<"general" | "listStart">(
@@ -596,30 +599,10 @@ export default function StaffQueuePage() {
                 </div>
               )}
               {pendingMove?.to === "fulfil_submitted" && (
-                <div className="mt-3 grid grid-cols-1 gap-3">
-                  <div className="space-y-2">
-                    <Label>Merchant Link</Label>
-                    <Input
-                      value={merchantLink}
-                      onChange={(e) => setMerchantLink(e.target.value)}
-                      placeholder="https://merchant.com/order"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Name on Order</Label>
-                    <Input
-                      value={nameOnOrder}
-                      onChange={(e) => setNameOnOrder(e.target.value)}
-                      placeholder="Exact name"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Final Value Charged (USD)</Label>
-                    <Input
-                      value={finalValueUsd}
-                      onChange={(e) => setFinalValueUsd(e.target.value)}
-                      placeholder="e.g. 120"
-                    />
+                <div className="mt-3">
+                  <div className="text-sm text-muted-foreground">
+                    You will be asked to fill fulfilment details and upload
+                    proof files in the next step.
                   </div>
                 </div>
               )}
@@ -665,41 +648,13 @@ export default function StaffQueuePage() {
                     } else if (from === "on_hold" && to === "in_progress") {
                       await resume({ orderId: id as any });
                     } else if (
-                      from === "in_progress" &&
-                      to === "fulfil_submitted"
+                      (from === "in_progress" && to === "fulfil_submitted") ||
+                      (from === "on_hold" && to === "fulfil_submitted")
                     ) {
-                      const finalVal = parseFloat(finalValueUsd);
-                      if (
-                        !merchantLink.trim() ||
-                        !nameOnOrder.trim() ||
-                        isNaN(finalVal)
-                      )
-                        return;
-                      await submitFulfilment({
-                        orderId: id as any,
-                        merchantLink: merchantLink.trim(),
-                        nameOnOrder: nameOnOrder.trim(),
-                        finalValueUsd: finalVal,
-                        proofFileIds: [],
-                      });
-                    } else if (
-                      from === "on_hold" &&
-                      to === "fulfil_submitted"
-                    ) {
-                      const finalVal = parseFloat(finalValueUsd);
-                      if (
-                        !merchantLink.trim() ||
-                        !nameOnOrder.trim() ||
-                        isNaN(finalVal)
-                      )
-                        return;
-                      await submitFulfilment({
-                        orderId: id as any,
-                        merchantLink: merchantLink.trim(),
-                        nameOnOrder: nameOnOrder.trim(),
-                        finalValueUsd: finalVal,
-                        proofFileIds: [],
-                      });
+                      // Defer details to modal with uploads
+                      setConfirmOpen(false);
+                      setFulfilOrderId(id);
+                      setFulfilDialogOpen(true);
                     }
                   } finally {
                     setPendingMove(null);
@@ -715,6 +670,11 @@ export default function StaffQueuePage() {
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
+        <FulfilmentSubmitDialog
+          orderId={fulfilOrderId}
+          open={fulfilDialogOpen}
+          onOpenChange={(o) => setFulfilDialogOpen(o)}
+        />
         {/* Pass-only modal */}
         <AlertDialog
           open={passOpen}

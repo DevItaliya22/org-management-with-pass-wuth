@@ -508,7 +508,7 @@ export default function OrderChat({
       <CardHeader>
         <CardTitle>Chat</CardTitle>
       </CardHeader>
-      <CardContent className="flex-1 flex flex-col gap-3">
+      <CardContent className="flex-1 flex flex-col gap-3 h-[70vh]">
         {hasDisputes && (
           <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-2">
             <div className="flex items-center gap-2">

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { useRouter } from "next/navigation";
@@ -21,14 +21,29 @@ type Props = {
   orderId: string;
 };
 
-export default function RaiseDisputeButton({ orderId }: Props) {
+export default function RaiseDisputeDialog({ orderId }: Props) {
   const router = useRouter();
   const raiseDispute = useMutation(api.orders.raiseDispute);
+  const generateUploadUrl = useMutation(api.chat.generateUploadUrl);
+  const saveUploadedFile = useMutation(api.chat.saveUploadedFile);
 
   const [open, setOpen] = useState(false);
   const [reason, setReason] = useState("");
   const [files, setFiles] = useState<File[]>([]);
+  const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<Record<string, number>>(
+    {},
+  );
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  const resetAndClose = () => {
+    setOpen(false);
+    setReason("");
+    setFiles([]);
+    setUploadProgress({});
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
 
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const selected = Array.from(event.target.files || []);
@@ -47,14 +62,53 @@ export default function RaiseDisputeButton({ orderId }: Props) {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
   };
 
+  const uploadSelectedFiles = async (): Promise<Array<string>> => {
+    if (files.length === 0) return [];
+    setUploading(true);
+    try {
+      const uploadedIds: Array<string> = [];
+      for (let index = 0; index < files.length; index++) {
+        const file = files[index];
+        const key = `${file.name}-${file.size}-${index}`;
+        setUploadProgress((p) => ({ ...p, [key]: 10 }));
+        const postUrl = await generateUploadUrl();
+        setUploadProgress((p) => ({ ...p, [key]: 50 }));
+        const result = await fetch(postUrl, {
+          method: "POST",
+          headers: { "Content-Type": file.type },
+          body: file,
+        });
+        const { storageId } = await result.json();
+        setUploadProgress((p) => ({ ...p, [key]: 80 }));
+        const fileId = await saveUploadedFile({
+          storageId,
+          uiName: file.name,
+          sizeBytes: file.size,
+          entityType: "dispute",
+          entityId: undefined,
+        });
+        uploadedIds.push(fileId as unknown as string);
+        setUploadProgress((p) => ({ ...p, [key]: 100 }));
+      }
+      return uploadedIds;
+    } finally {
+      setUploading(false);
+    }
+  };
+
   const onSubmit = async () => {
     if (!reason.trim()) return;
     setSubmitting(true);
     try {
-      await raiseDispute({ orderId: orderId as any, reason: reason.trim() });
-      setOpen(false);
-      setReason("");
-      setFiles([]);
+      const attachmentFileIds = await uploadSelectedFiles();
+      await raiseDispute({
+        orderId: orderId as any,
+        reason: reason.trim(),
+        attachmentFileIds: attachmentFileIds.length
+          ? (attachmentFileIds as any)
+          : undefined,
+      });
+      resetAndClose();
       router.refresh();
     } finally {
       setSubmitting(false);
@@ -67,7 +121,17 @@ export default function RaiseDisputeButton({ orderId }: Props) {
         Raise Dispute
       </Button>
 
-      <Dialog open={open} onOpenChange={setOpen}>
+      <Dialog
+        open={open}
+        onOpenChange={(o) => {
+          if (!o) {
+            if (submitting || uploading) return;
+            resetAndClose();
+          } else {
+            setOpen(true);
+          }
+        }}
+      >
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Raise Dispute</DialogTitle>
@@ -99,6 +163,7 @@ export default function RaiseDisputeButton({ orderId }: Props) {
                     onChange={handleFileSelect}
                     className="hidden"
                     accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.gif,.txt"
+                    ref={fileInputRef}
                   />
                   <Label
                     htmlFor="dispute-files"
@@ -128,6 +193,14 @@ export default function RaiseDisputeButton({ orderId }: Props) {
                               </div>
                               <div className="text-xs text-muted-foreground">
                                 {formatFileSize(file.size)}
+                                {uploading && (
+                                  <span className="ml-2">
+                                    {uploadProgress[
+                                      `${file.name}-${file.size}-${index}`
+                                    ] || 0}
+                                    %
+                                  </span>
+                                )}
                               </div>
                             </div>
                           </div>
@@ -156,13 +229,18 @@ export default function RaiseDisputeButton({ orderId }: Props) {
                 setOpen(false);
                 setReason("");
                 setFiles([]);
+                setUploadProgress({});
+                if (fileInputRef.current) fileInputRef.current.value = "";
               }}
-              disabled={submitting}
+              disabled={submitting || uploading}
             >
               Cancel
             </Button>
-            <Button disabled={!reason.trim() || submitting} onClick={onSubmit}>
-              {submitting ? "Submitting…" : "Submit Dispute"}
+            <Button
+              disabled={!reason.trim() || submitting || uploading}
+              onClick={onSubmit}
+            >
+              {submitting || uploading ? "Submitting…" : "Submit Dispute"}
             </Button>
           </DialogFooter>
         </DialogContent>

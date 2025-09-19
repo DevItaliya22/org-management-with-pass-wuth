@@ -32,7 +32,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import RaiseDisputeButton from "./RaiseDisputeButton";
+import RaiseDisputeDialog from "./RaiseDisputeDialog";
 
 export default function OrderDetailsPage() {
   const {
@@ -296,7 +296,7 @@ export default function OrderDetailsPage() {
             >
               {completing ? "Completing…" : "Mark Complete"}
             </Button>
-            <RaiseDisputeButton orderId={order._id} />
+            <RaiseDisputeDialog orderId={order._id} />
           </div>
         )}
 
@@ -534,6 +534,22 @@ export default function OrderDetailsPage() {
                         ${order.fulfilment.finalValueUsd}
                       </span>
                     </div>
+
+                    {order.fulfilment.proofFileIds &&
+                      order.fulfilment.proofFileIds.length > 0 && (
+                        <div className="mt-3 space-y-2">
+                          <h4 className="font-medium text-sm">
+                            Fulfilment Proof
+                          </h4>
+                          <div className="space-y-2">
+                            {order.fulfilment.proofFileIds.map(
+                              (fileId: any) => (
+                                <AttachmentFile key={fileId} fileId={fileId} />
+                              ),
+                            )}
+                          </div>
+                        </div>
+                      )}
                   </section>
                 </>
               )}
@@ -586,7 +602,7 @@ export default function OrderDetailsPage() {
                   </>
                 )}
 
-              {(isOwner || isReseller) && disputes && disputes.length > 0 && (
+              {disputes && disputes.length > 0 && (
                 <>
                   <Separator />
                   <section className="space-y-2">
@@ -632,6 +648,23 @@ export default function OrderDetailsPage() {
                           {d.resolutionNotes && (
                             <div>Notes: {d.resolutionNotes}</div>
                           )}
+
+                          {d.attachmentFileIds &&
+                            d.attachmentFileIds.length > 0 && (
+                              <div className="space-y-2">
+                                <div className="text-xs font-medium text-muted-foreground">
+                                  Dispute Attachments
+                                </div>
+                                <div className="space-y-2">
+                                  {d.attachmentFileIds.map((fileId: any) => (
+                                    <AttachmentFile
+                                      key={fileId}
+                                      fileId={fileId}
+                                    />
+                                  ))}
+                                </div>
+                              </div>
+                            )}
 
                           {/* Owner Action Dropdown */}
                           {isOwner && d.status === "open" && (
