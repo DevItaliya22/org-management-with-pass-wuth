@@ -18,12 +18,15 @@ import { Button } from "@/components/ui/button";
 import { Eye } from "lucide-react";
 
 export default function OrdersPage() {
-  const { isLoading, isResellerAdmin, session } = useRole();
+  const { isLoading, isResellerAdmin, session, authSession } = useRole();
 
   // Single role-aware query handled on the backend
-  const page = useQuery(api.orders.listOrdersForViewer, {
-    paginationOpts: { numItems: 20, cursor: null },
-  });
+  const page = useQuery(api.orders.listOrdersForViewer, 
+    isLoading ? "skip" : {
+      userId: authSession?.user?.id as any,
+      paginationOpts: { numItems: 20, cursor: null },
+    }
+  );
   const userIds: string[] = Array.from(
     new Set((page?.page ?? []).map((o: any) => o.createdByUserId)),
   );

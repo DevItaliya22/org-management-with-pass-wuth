@@ -1,16 +1,24 @@
 "use client";
 
+import { useSession } from "next-auth/react";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 
 export function useRole() {
-  const session = useQuery(api.session.getCurrentUserSession, {});
-  const isLoading = session === undefined;
+  const { data: authSession, status } = useSession();
+  const isLoading = status === "loading";
+
+  // Get additional user data from Convex
+  const convexSession = useQuery(
+    api.session.getCurrentUserSession, 
+    authSession?.user?.id ? { userId: authSession.user.id as any } : "skip"
+  );
+  const convexLoading = convexSession === undefined;
 
   // Avoid defaulting while loading to prevent incorrect redirects/404s on hard reload
-  const role = isLoading ? undefined : session?.user?.role;
-  const memberStatus = session?.resellerMember?.status;
-  const memberRole = session?.resellerMember?.role;
+  const role = isLoading || convexLoading ? undefined : (authSession?.user as any)?.role || convexSession?.user?.role;
+  const memberStatus = convexSession?.resellerMember?.status;
+  const memberRole = convexSession?.resellerMember?.role;
 
   const isOwner = role === "owner";
   const isStaff = role === "staff";
@@ -23,8 +31,9 @@ export function useRole() {
   const isReseller = role === "reseller";
 
   return {
-    session,
-    isLoading,
+    session: convexSession,
+    authSession,
+    isLoading: isLoading || convexLoading,
     role,
     isOwner,
     isStaff,

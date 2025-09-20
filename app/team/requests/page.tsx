@@ -19,10 +19,10 @@ import { Inbox } from "lucide-react";
 import { toast } from "@/components/ui/sonner";
 
 export default function TeamRequestsPage() {
-  const { isLoading, isResellerDefaultMember, isResellerMember } = useRole();
+  const { isLoading, isResellerDefaultMember, isResellerMember, authSession } = useRole();
   const invites = useQuery(
     api.teams.listMyInvitations,
-    isLoading ? (undefined as any) : {},
+    isLoading ? (undefined as any) : { userId: authSession?.user?.id as any },
   );
   const accept = useMutation(api.teams.acceptInvitation);
   const reject = useMutation(api.teams.rejectInvitation);
@@ -91,7 +91,7 @@ export default function TeamRequestsPage() {
                             className="bg-green-600 text-white hover:bg-green-600"
                             onClick={async () => {
                               try {
-                                await accept({ invitationId: i._id });
+                                await accept({ invitationId: i._id, userId: authSession?.user?.id as any });
                                 toast.success("Invitation accepted");
                               } catch (e: any) {
                                 toast.error(e?.message ?? "Failed to accept");
@@ -105,7 +105,7 @@ export default function TeamRequestsPage() {
                             variant="destructive"
                             onClick={async () => {
                               try {
-                                await reject({ invitationId: i._id });
+                                await reject({ invitationId: i._id, userId: authSession?.user?.id as any });
                                 toast.success("Invitation rejected");
                               } catch (e: any) {
                                 toast.error(e?.message ?? "Failed to reject");

@@ -1,7 +1,7 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { Id } from "./_generated/dataModel";
-import { getAuthUserId } from "@convex-dev/auth/server";
+// Removed Convex Auth import - authentication handled by NextAuth.js
 
 export const generateUploadUrl = mutation({
   args: {},
@@ -23,10 +23,11 @@ export const saveFile = mutation({
       v.literal("fulfilment"),
     ),
     entityId: v.optional(v.string()),
+    userId: v.id("users"),
   },
   returns: v.id("files"),
   handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx);
+    const userId = args.userId;
     if (!userId) {
       throw new Error("Not authenticated");
     }
@@ -146,10 +147,11 @@ export const updateFileEntityId = mutation({
   args: {
     fileId: v.id("files"),
     entityId: v.string(),
+    userId: v.id("users"),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx);
+    const userId = args.userId;
     if (!userId) {
       throw new Error("Not authenticated");
     }
@@ -179,10 +181,13 @@ export const updateFileEntityId = mutation({
 });
 
 export const deleteFile = mutation({
-  args: { fileId: v.id("files") },
+  args: { 
+    fileId: v.id("files"),
+    userId: v.id("users"),
+  },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx);
+    const userId = args.userId;
     if (!userId) {
       throw new Error("Not authenticated");
     }

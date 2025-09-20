@@ -22,7 +22,7 @@ import { Upload, File, X } from "lucide-react";
 import { toast } from "@/components/ui/sonner";
 
 export default function NewOrderPage() {
-  const { session, isLoading, isStaff, isOwner } = useRole();
+  const { session, isLoading, isStaff, isOwner, authSession } = useRole();
   const router = useRouter();
   const categories = useQuery(api.orders.listActiveCategories, {});
   const createOrder = useMutation(api.orders.createOrder);
@@ -93,6 +93,7 @@ export default function NewOrderPage() {
           sizeBytes: file.size,
           entityType: "order",
           entityId: undefined, // Will be set after order creation
+          userId: authSession?.user?.id as any,
         });
 
         fileIds.push(fileId);
@@ -144,6 +145,7 @@ export default function NewOrderPage() {
         timeWindow: timeWindow || undefined,
         itemsSummary: itemsSummary || undefined,
         currencyOverride: currencyOverride || undefined,
+        userId: authSession?.user?.id as any,
       });
 
       // Update file entity IDs with the created order ID
@@ -151,6 +153,7 @@ export default function NewOrderPage() {
         await updateFileEntityId({
           fileId: fileId as any,
           entityId: orderId as unknown as string,
+          userId: authSession?.user?.id as any,
         });
       }
       // Smooth redirect to the created order's page

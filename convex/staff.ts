@@ -1,6 +1,6 @@
 import { action, internalMutation, query, mutation } from "./_generated/server";
 import { v } from "convex/values";
-import { getAuthUserId } from "@convex-dev/auth/server";
+// Removed Convex Auth import - authentication handled by NextAuth.js
 import { internal } from "./_generated/api";
 import { internal as internalApi } from "./_generated/api";
 
@@ -10,28 +10,25 @@ export const createStaffWithPassword = action({
     email: v.string(),
     password: v.string(),
     name: v.optional(v.string()),
+    ownerUserId: v.id("users"),
   },
   returns: v.object({ userId: v.id("users") }),
-  handler: async (ctx, args) => {
-    const ownerUserId = await getAuthUserId(ctx);
+  handler: async (ctx, args): Promise<{ userId: any }> => {
+    const ownerUserId = args.ownerUserId;
     if (!ownerUserId) throw new Error("Not authenticated");
 
-    // Create auth user via Convex Auth store mutation
-    const createResult: any = await ctx.runMutation(internal.auth.store, {
-      args: {
-        type: "createAccountFromCredentials",
-        provider: "password",
-        // Pass role in profile so auth bootstrap can detect staff
-        profile: { email: args.email, name: args.name, role: "staff" },
-        account: { id: args.email, secret: args.password },
-      },
-    });
-
-    if (!createResult || !("user" in createResult)) {
-      throw new Error("Failed to create staff user");
+    // Verify the caller is an owner
+    const owner = await ctx.runQuery(internal.access.getViewerOrThrow, { userId: ownerUserId });
+    if (owner.user.role !== "owner") {
+      throw new Error("Only owners can create staff users");
     }
 
-    const userId = createResult.user._id;
+    // Create user directly in the database
+    const userId = await ctx.runMutation(internal.users.createStaffUser, {
+      email: args.email,
+      password: args.password,
+      name: args.name,
+    });
 
     await ctx.runMutation(internal.staff.finalizeStaffCreation, { userId });
 
@@ -68,11 +65,11 @@ export const finalizeStaffCreation = internalMutation({
 
 // Get all staff members with their user details
 export const getAllStaff = query({
-  args: {},
+  args: { userId: v.id("users") },
   returns: v.array(
     v.object({
       _id: v.id("staff"),
-      _creationTime: v.number(), // System field automatically added by Convex
+      _creationTime: v.float64(), // System field automatically added by Convex
       userId: v.id("users"),
       status: v.union(
         v.literal("online"),
@@ -80,12 +77,13 @@ export const getAllStaff = query({
         v.literal("offline"),
       ),
       isActive: v.boolean(),
-      capacityHint: v.optional(v.number()),
-      lastPausedAt: v.optional(v.number()),
-      createdAt: v.number(),
-      updatedAt: v.number(),
+      capacityHint: v.optional(v.float64()),
+      lastPausedAt: v.optional(v.float64()),
+      createdAt: v.float64(),
+      updatedAt: v.float64(),
       user: v.object({
         _id: v.id("users"),
+        _creationTime: v.float64(),
         name: v.optional(v.string()),
         email: v.string(),
         role: v.optional(
@@ -98,8 +96,8 @@ export const getAllStaff = query({
       }),
     }),
   ),
-  handler: async (ctx) => {
-    const ownerUserId = await getAuthUserId(ctx);
+  handler: async (ctx, args) => {
+    const ownerUserId = args.userId;
     if (!ownerUserId) throw new Error("Not authenticated");
 
     // Get all staff records
@@ -116,6 +114,7 @@ export const getAllStaff = query({
           ...staff,
           user: {
             _id: user._id,
+            _creationTime: user._creationTime,
             name: user.name,
             email: user.email,
             role: user.role,
@@ -136,9 +135,6 @@ export const updateStaffName = mutation({
   },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const ownerUserId = await getAuthUserId(ctx);
-    if (!ownerUserId) throw new Error("Not authenticated");
-
     // Update the user's name
     await ctx.db.patch(args.userId, { name: args.name });
 
@@ -158,10 +154,10 @@ export const updateStaffName = mutation({
 
 // Get current viewer's staff record
 export const getMyStaff = query({
-  args: {},
+  args: { userId: v.id("users") },
   returns: v.union(
     v.object({
-      _creationTime: v.number(),
+      _creationTime: v.float64(),
       _id: v.id("staff"),
       userId: v.id("users"),
       status: v.union(
@@ -170,15 +166,15 @@ export const getMyStaff = query({
         v.literal("offline"),
       ),
       isActive: v.boolean(),
-      capacityHint: v.optional(v.number()),
-      lastPausedAt: v.optional(v.number()),
-      createdAt: v.number(),
-      updatedAt: v.number(),
+      capacityHint: v.optional(v.float64()),
+      lastPausedAt: v.optional(v.float64()),
+      createdAt: v.float64(),
+      updatedAt: v.float64(),
     }),
     v.null(),
   ),
-  handler: async (ctx) => {
-    const userId = await getAuthUserId(ctx);
+  handler: async (ctx, args) => {
+    const userId = args.userId;
     if (!userId) throw new Error("Not authenticated");
     const staff = await ctx.db
       .query("staff")
@@ -192,10 +188,11 @@ export const getMyStaff = query({
 export const updateMyStatus = mutation({
   args: {
     status: v.union(v.literal("online"), v.literal("paused"), v.literal("offline")),
+    userId: v.id("users"),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx);
+    const userId = args.userId;
     if (!userId) throw new Error("Not authenticated");
     const staff = await ctx.db
       .query("staff")

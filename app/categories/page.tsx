@@ -40,7 +40,7 @@ import { notFound } from "next/navigation";
 import { toast } from "@/components/ui/sonner";
 
 export default function CategoriesPage() {
-  const { isLoading, isOwner } = useRole();
+  const { isLoading, isOwner, authSession } = useRole();
   const [name, setName] = useState("");
   const [slug, setSlug] = useState("");
   const [creating, setCreating] = useState(false);
@@ -53,7 +53,7 @@ export default function CategoriesPage() {
   // Always call hooks; use stable positions and gate after
   const cats = useQuery(
     api.orders.listAllCategories,
-    isLoading ? (undefined as any) : {},
+    isLoading ? (undefined as any) : { userId: authSession?.user?.id as any },
   );
   const createCat = useMutation(api.orders.createCategory);
   const toggleActive = useMutation(api.orders.toggleCategoryActive);
@@ -72,7 +72,7 @@ export default function CategoriesPage() {
         toast.error("Name and slug are required");
         return;
       }
-      await createCat({ name: trimmedName, slug: trimmedSlug });
+      await createCat({ name: trimmedName, slug: trimmedSlug, userId: authSession?.user?.id as any });
       setName("");
       setSlug("");
       toast.success("Category created");
@@ -199,6 +199,7 @@ export default function CategoriesPage() {
                                 categoryId: c._id,
                                 name,
                                 slug,
+                                userId: authSession?.user?.id as any,
                               });
                             }}
                           />
@@ -235,6 +236,7 @@ export default function CategoriesPage() {
                       await toggleActive({
                         categoryId: pendingToggle.id as any,
                         isActive: pendingToggle.next,
+                        userId: authSession?.user?.id as any,
                       });
                       toast.success(
                         pendingToggle.next ? "Category activated" : "Category deactivated",

@@ -1,13 +1,12 @@
 import { query, mutation } from "./_generated/server";
 import { v } from "convex/values";
-import { getAuthUserId } from "@convex-dev/auth/server";
+// Removed Convex Auth import - authentication handled by NextAuth.js
 import { Doc, Id } from "./_generated/dataModel";
 import { paginationOptsValidator } from "convex/server";
 // no internal API references here; keep ACL local
 
 // Helper to ensure viewer and load minimal user
-async function requireViewer(ctx: any) {
-  const userId = await getAuthUserId(ctx);
+async function requireViewer(ctx: any, userId: Id<"users">) {
   if (!userId) throw new Error("Not authenticated");
   const user = await ctx.db.get(userId);
   if (!user) throw new Error("User not found");
@@ -31,10 +30,11 @@ export const createOrder = mutation({
     timeWindow: v.optional(v.string()),
     itemsSummary: v.optional(v.string()),
     currencyOverride: v.optional(v.string()),
+    userId: v.id("users"),
   },
   returns: v.object({ orderId: v.id("orders") }),
   handler: async (ctx, args) => {
-    const { userId, user } = await requireViewer(ctx);
+    const { userId, user } = await requireViewer(ctx, args.userId);
 
     // Only non-owner/non-staff can create orders (reseller-side users of any kind)
     if (user.role === "owner" || user.role === "staff") {
@@ -136,10 +136,10 @@ export const createOrder = mutation({
 });
 
 export const getOrderById = query({
-  args: { orderId: v.id("orders") },
+  args: { orderId: v.id("orders"), userId: v.id("users") },
   returns: v.any(),
   handler: async (ctx, args) => {
-    const { userId, user } = await requireViewer(ctx);
+    const { userId, user } = await requireViewer(ctx, args.userId);
     const order = await ctx.db.get(args.orderId);
     if (!order) return null;
 
@@ -199,10 +199,11 @@ export const listOrdersForOwner = query({
     ),
     teamId: v.optional(v.id("teams")),
     categoryId: v.optional(v.id("categories")),
+    userId: v.id("users"),
   },
   returns: v.any(),
   handler: async (ctx, args) => {
-    const { user } = await requireViewer(ctx);
+    const { user } = await requireViewer(ctx, args.userId);
     if (user.role !== "owner") throw new Error("Not authorized");
 
     if (args.teamId) {
@@ -245,10 +246,11 @@ export const listOrdersForReseller = query({
   args: {
     paginationOpts: paginationOptsValidator,
     teamId: v.optional(v.id("teams")),
+    userId: v.id("users"),
   },
   returns: v.any(),
   handler: async (ctx, args) => {
-    const { userId, user } = await requireViewer(ctx);
+    const { userId, user } = await requireViewer(ctx, args.userId);
     if (user.role !== "reseller") throw new Error("Not authorized");
 
     if (args.teamId) {
@@ -289,10 +291,10 @@ export const listOrdersForReseller = query({
 });
 
 export const staffInQueue = query({
-  args: { paginationOpts: paginationOptsValidator },
+  args: { paginationOpts: paginationOptsValidator, userId: v.id("users") },
   returns: v.any(),
   handler: async (ctx, args) => {
-    const { userId, user } = await requireViewer(ctx);
+    const { userId, user } = await requireViewer(ctx, args.userId);
     if (user.role !== "staff") throw new Error("Not authorized");
 
     const page = await ctx.db
@@ -311,10 +313,10 @@ export const staffInQueue = query({
 });
 
 export const listMyWork = query({
-  args: { paginationOpts: paginationOptsValidator },
+  args: { paginationOpts: paginationOptsValidator, userId: v.id("users") },
   returns: v.any(),
   handler: async (ctx, args) => {
-    const { userId, user } = await requireViewer(ctx);
+    const { userId, user } = await requireViewer(ctx, args.userId);
     if (user.role !== "staff") throw new Error("Not authorized");
     const page = await ctx.db
       .query("orders")
@@ -327,10 +329,10 @@ export const listMyWork = query({
 
 // Picked orders assigned to current staff (status strictly 'picked')
 export const listPickedOrders = query({
-  args: { paginationOpts: paginationOptsValidator },
+  args: { paginationOpts: paginationOptsValidator, userId: v.id("users") },
   returns: v.any(),
   handler: async (ctx, args) => {
-    const { userId, user } = await requireViewer(ctx);
+    const { userId, user } = await requireViewer(ctx, args.userId);
     if (user.role !== "staff") throw new Error("Not authorized");
     const page = await ctx.db
       .query("orders")
@@ -345,10 +347,10 @@ export const listPickedOrders = query({
 
 // Role-aware single query for unified orders page
 export const listOrdersForViewer = query({
-  args: { paginationOpts: paginationOptsValidator },
+  args: { paginationOpts: paginationOptsValidator, userId: v.id("users") },
   returns: v.any(),
   handler: async (ctx, args) => {
-    const { userId, user } = await requireViewer(ctx);
+    const { userId, user } = await requireViewer(ctx, args.userId);
     if (user.role === "owner") {
       return await ctx.db
         .query("orders")
@@ -440,10 +442,10 @@ export const listActiveCategories = query({
 });
 
 export const listAllCategories = query({
-  args: {},
+  args: { userId: v.id("users") },
   returns: v.any(),
-  handler: async (ctx) => {
-    const { user } = await requireViewer(ctx);
+  handler: async (ctx, args) => {
+    const { user } = await requireViewer(ctx, args.userId);
     if (user.role !== "owner") throw new Error("Not authorized");
     const cats = await ctx.db
       .query("categories")
@@ -494,10 +496,10 @@ export const getUserTeamRoles = query({
 });
 
 export const createCategory = mutation({
-  args: { name: v.string(), slug: v.string() },
+  args: { name: v.string(), slug: v.string(), userId: v.id("users") },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const { user } = await requireViewer(ctx);
+    const { user } = await requireViewer(ctx, args.userId);
     if (user.role !== "owner") throw new Error("Not authorized");
     const now = Date.now();
     await ctx.db.insert("categories", {
@@ -512,10 +514,10 @@ export const createCategory = mutation({
 });
 
 export const toggleCategoryActive = mutation({
-  args: { categoryId: v.id("categories"), isActive: v.boolean() },
+  args: { categoryId: v.id("categories"), isActive: v.boolean(), userId: v.id("users") },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const { user } = await requireViewer(ctx);
+    const { user } = await requireViewer(ctx, args.userId);
     if (user.role !== "owner") throw new Error("Not authorized");
     const cat = await ctx.db.get(args.categoryId);
     if (!cat) throw new Error("Category not found");
@@ -528,10 +530,10 @@ export const toggleCategoryActive = mutation({
 });
 
 export const updateCategory = mutation({
-  args: { categoryId: v.id("categories"), name: v.string(), slug: v.string() },
+  args: { categoryId: v.id("categories"), name: v.string(), slug: v.string(), userId: v.id("users") },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const { user } = await requireViewer(ctx);
+    const { user } = await requireViewer(ctx, args.userId);
     if (user.role !== "owner") throw new Error("Not authorized");
     const cat = await ctx.db.get(args.categoryId);
     if (!cat) throw new Error("Category not found");
@@ -545,10 +547,10 @@ export const updateCategory = mutation({
 });
 
 export const pickOrder = mutation({
-  args: { orderId: v.id("orders") },
+  args: { orderId: v.id("orders"), userId: v.id("users") },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const { userId, user } = await requireViewer(ctx);
+    const { userId, user } = await requireViewer(ctx, args.userId);
     if (user.role !== "staff") throw new Error("Not authorized");
 
     const order = await ctx.db.get(args.orderId);
@@ -593,10 +595,10 @@ export const pickOrder = mutation({
 });
 
 export const passOrder = mutation({
-  args: { orderId: v.id("orders"), reason: v.string() },
+  args: { orderId: v.id("orders"), reason: v.string(), userId: v.id("users") },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const { userId, user } = await requireViewer(ctx);
+    const { userId, user } = await requireViewer(ctx, args.userId);
     if (user.role !== "staff") throw new Error("Not authorized");
 
     const order = await ctx.db.get(args.orderId);
@@ -661,10 +663,10 @@ export const passOrder = mutation({
 });
 
 export const moveToInProgress = mutation({
-  args: { orderId: v.id("orders") },
+  args: { orderId: v.id("orders"), userId: v.id("users") },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const { userId, user } = await requireViewer(ctx);
+    const { userId, user } = await requireViewer(ctx, args.userId);
     if (user.role !== "staff") throw new Error("Not authorized");
     const order = await ctx.db.get(args.orderId);
     if (!order) throw new Error("Order not found");
@@ -688,10 +690,10 @@ export const moveToInProgress = mutation({
 });
 
 export const holdOrder = mutation({
-  args: { orderId: v.id("orders"), reason: v.string() },
+  args: { orderId: v.id("orders"), reason: v.string(), userId: v.id("users") },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const { userId, user } = await requireViewer(ctx);
+    const { userId, user } = await requireViewer(ctx, args.userId);
     if (user.role !== "staff") throw new Error("Not authorized");
     const order = await ctx.db.get(args.orderId);
     if (!order) throw new Error("Order not found");
@@ -720,10 +722,10 @@ export const holdOrder = mutation({
 });
 
 export const resumeOrder = mutation({
-  args: { orderId: v.id("orders") },
+  args: { orderId: v.id("orders"), userId: v.id("users") },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const { userId, user } = await requireViewer(ctx);
+    const { userId, user } = await requireViewer(ctx, args.userId);
     if (user.role !== "staff") throw new Error("Not authorized");
     const order = await ctx.db.get(args.orderId);
     if (!order) throw new Error("Order not found");
@@ -756,10 +758,11 @@ export const submitFulfilment = mutation({
     nameOnOrder: v.string(),
     finalValueUsd: v.number(),
     proofFileIds: v.array(v.id("files")),
+    userId: v.id("users"),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const { userId, user } = await requireViewer(ctx);
+    const { userId, user } = await requireViewer(ctx, args.userId);
     if (user.role !== "staff") throw new Error("Not authorized");
     const order = await ctx.db.get(args.orderId);
     if (!order) throw new Error("Order not found");
@@ -792,10 +795,10 @@ export const submitFulfilment = mutation({
 });
 
 export const completeOrder = mutation({
-  args: { orderId: v.id("orders") },
+  args: { orderId: v.id("orders"), userId: v.id("users") },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const { userId, user } = await requireViewer(ctx);
+    const { userId, user } = await requireViewer(ctx, args.userId);
     if (user.role !== "reseller") throw new Error("Not authorized");
     const order = await ctx.db.get(args.orderId);
     if (!order) throw new Error("Order not found");
@@ -842,10 +845,11 @@ export const raiseDispute = mutation({
     orderId: v.id("orders"),
     reason: v.string(),
     attachmentFileIds: v.optional(v.array(v.id("files"))),
+    userId: v.id("users"),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const { userId, user } = await requireViewer(ctx);
+    const { userId, user } = await requireViewer(ctx, args.userId);
     if (user.role !== "reseller") throw new Error("Not authorized");
     const order = await ctx.db.get(args.orderId);
     if (!order) throw new Error("Order not found");
@@ -940,7 +944,7 @@ export const getDisputesByOrder = query({
 
 // Get team members available for permission assignment (owner and reseller admin)
 export const getTeamMembersForPermissions = query({
-  args: { orderId: v.id("orders") },
+  args: { orderId: v.id("orders"), userId: v.id("users") },
   returns: v.array(
     v.object({
       _id: v.id("users"),
@@ -952,7 +956,7 @@ export const getTeamMembersForPermissions = query({
     }),
   ),
   handler: async (ctx, args) => {
-    const { userId, user } = await requireViewer(ctx);
+    const { userId, user } = await requireViewer(ctx, args.userId);
 
     const order = await ctx.db.get(args.orderId);
     if (!order) throw new Error("Order not found");
@@ -1026,7 +1030,7 @@ export const getTeamMembersForPermissions = query({
 
 // For owner-side permissions: list only staff and owners (non-reseller users)
 export const getOwnerSideMembersForPermissions = query({
-  args: { orderId: v.id("orders") },
+  args: { orderId: v.id("orders"), userId: v.id("users") },
   returns: v.array(
     v.object({
       _id: v.id("users"),
@@ -1038,7 +1042,7 @@ export const getOwnerSideMembersForPermissions = query({
     }),
   ),
   handler: async (ctx, args) => {
-    const { user } = await requireViewer(ctx);
+    const { user } = await requireViewer(ctx, args.userId);
     const order = await ctx.db.get(args.orderId);
     if (!order) throw new Error("Order not found");
     if (user.role !== "owner") throw new Error("Not authorized");
@@ -1084,10 +1088,11 @@ export const updateOrderReadAccess = mutation({
   args: {
     orderId: v.id("orders"),
     userIds: v.array(v.id("users")),
+    userId: v.id("users"),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const { userId, user } = await requireViewer(ctx);
+    const { userId, user } = await requireViewer(ctx, args.userId);
 
     const order = await ctx.db.get(args.orderId);
     if (!order) throw new Error("Order not found");
@@ -1169,10 +1174,11 @@ export const updateOrderWriteAccess = mutation({
   args: {
     orderId: v.id("orders"),
     userIds: v.array(v.id("users")),
+    userId: v.id("users"),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const { userId, user } = await requireViewer(ctx);
+    const { userId, user } = await requireViewer(ctx, args.userId);
 
     const order = await ctx.db.get(args.orderId);
     if (!order) throw new Error("Order not found");
@@ -1245,7 +1251,7 @@ export const updateOrderWriteAccess = mutation({
 
 // Get who has access to an order (read-only view for members and staff)
 export const getOrderAccessInfo = query({
-  args: { orderId: v.id("orders") },
+  args: { orderId: v.id("orders"), userId: v.id("users") },
   returns: v.object({
     readAccessUsers: v.array(
       v.object({
@@ -1263,7 +1269,7 @@ export const getOrderAccessInfo = query({
     ),
   }),
   handler: async (ctx, args) => {
-    const { userId, user } = await requireViewer(ctx);
+    const { userId, user } = await requireViewer(ctx, args.userId);
     const order = await ctx.db.get(args.orderId);
     if (!order) throw new Error("Order not found");
 
@@ -1327,10 +1333,11 @@ export const fixAndCompleteDispute = mutation({
   args: {
     disputeId: v.id("disputes"),
     resolutionNotes: v.optional(v.string()),
+    userId: v.id("users"),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const { userId, user } = await requireViewer(ctx);
+    const { userId, user } = await requireViewer(ctx, args.userId);
     if (user.role !== "owner") throw new Error("Not authorized");
 
     const dispute = await ctx.db.get(args.disputeId);
@@ -1384,10 +1391,11 @@ export const declineAndCompleteDispute = mutation({
   args: {
     disputeId: v.id("disputes"),
     resolutionNotes: v.string(),
+    userId: v.id("users"),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const { userId, user } = await requireViewer(ctx);
+    const { userId, user } = await requireViewer(ctx, args.userId);
     if (user.role !== "owner") throw new Error("Not authorized");
 
     const dispute = await ctx.db.get(args.disputeId);
@@ -1442,10 +1450,11 @@ export const partialRefundAndCompleteDispute = mutation({
     disputeId: v.id("disputes"),
     adjustmentAmountUsd: v.number(),
     resolutionNotes: v.optional(v.string()),
+    userId: v.id("users"),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const { userId, user } = await requireViewer(ctx);
+    const { userId, user } = await requireViewer(ctx, args.userId);
     if (user.role !== "owner") throw new Error("Not authorized");
     if (args.adjustmentAmountUsd <= 0)
       throw new Error("Adjustment amount must be positive");

@@ -7,13 +7,16 @@ import { api } from "@/convex/_generated/api";
 import Link from "next/link";
 
 export default function OwnerDisputesPage() {
-  const { isLoading, isOwner } = useRole();
-  const disputesByOrder = useQuery(api.orders.listOrdersForOwner, {
-    paginationOpts: { numItems: 100, cursor: null },
-    status: "disputed" as any,
-    teamId: undefined,
-    categoryId: undefined,
-  });
+  const { isLoading, isOwner, authSession } = useRole();
+  const disputesByOrder = useQuery(api.orders.listOrdersForOwner, 
+    isLoading ? "skip" : {
+      paginationOpts: { numItems: 100, cursor: null },
+      status: "disputed" as any,
+      teamId: undefined,
+      categoryId: undefined,
+      userId: authSession?.user?.id as any,
+    }
+  );
 
   if (isLoading) return <div className="p-4">Loading…</div>;
   if (!isOwner) return <div className="p-4">Not authorized</div>;

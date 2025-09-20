@@ -30,7 +30,7 @@ import {
 import { toast } from "@/components/ui/sonner";
 
 export default function TeamInvitationsPage() {
-  const { isLoading, isResellerAdmin, session } = useRole();
+  const { isLoading, isResellerAdmin, session, authSession } = useRole();
   const isAdmin = isResellerAdmin;
   const teamId = session?.team?._id;
 
@@ -41,7 +41,7 @@ export default function TeamInvitationsPage() {
     isLoading
       ? (undefined as any)
       : teamId
-        ? { teamId, status: undefined }
+        ? { teamId, status: undefined, userId: authSession?.user?.id as any }
         : ("skip" as any),
   );
 
@@ -49,7 +49,7 @@ export default function TeamInvitationsPage() {
     e.preventDefault();
     if (!teamId || !email) return;
     try {
-      await invite({ teamId, invitedEmail: email });
+      await invite({ teamId, invitedEmail: email, userId: authSession?.user?.id as any });
       toast.success("Invitation sent");
       setEmail("");
       setInviteOpen(false);

@@ -1,19 +1,146 @@
 "use client";
 
-import { useAuthActions } from "@convex-dev/auth/react";
+import { signIn, getSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { toast } from "@/components/ui/sonner";
 
 export default function SignIn() {
-  const { signIn } = useAuthActions();
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
-  const [step, setStep] = useState<"signIn" | "signUp" | { email: string }>(
-    "signIn",
-  );
+  const [step, setStep] = useState<"signIn" | "signUp" | { email: string }>("signIn");
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+
+  useEffect(() => {
+    // Check if user is already signed in
+    getSession().then((session) => {
+      if (session) {
+        router.push("/");
+      }
+    });
+  }, [router]);
+
+  const handleGoogleSignIn = async () => {
+    setError(null);
+    setIsLoading(true);
+    try {
+      const result = await signIn("google", { 
+        redirect: false,
+        callbackUrl: "/"
+      });
+      console.log("Google sign-in result:", result);
+      
+      if (result?.error) {
+        setError("Google sign-in failed");
+        toast.error("Google sign-in failed");
+      } else if (result?.url) {
+        // If there's a URL, it means we need to redirect to Google OAuth
+        console.log("Redirecting to Google OAuth:", result.url);
+        window.location.href = result.url;
+      } else if (result?.ok) {
+        // Wait a moment for session to be established
+        setTimeout(async () => {
+          const session = await getSession();
+          console.log("Session after Google sign-in:", session);
+          if (session) {
+            toast.success("Signed in successfully");
+            router.push("/");
+          } else {
+            setError("Session not established");
+            toast.error("Session not established");
+          }
+        }, 1000);
+      }
+    } catch (err: any) {
+      console.error("Google sign-in error:", err);
+      setError(err?.message || "Google sign-in failed");
+      toast.error(err?.message || "Google sign-in failed");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleEmailAuth = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setError(null);
+    setIsLoading(true);
+
+    const formData = new FormData(event.currentTarget);
+    const email = formData.get("email") as string;
+    const password = formData.get("password") as string;
+    const name = formData.get("name") as string;
+    const flow = formData.get("flow") as string;
+
+    try {
+      const result = await signIn("credentials", {
+        email,
+        password,
+        name,
+        flow,
+        redirect: false,
+      });
+      
+      console.log("Credentials sign-in result:", result);
+
+      if (result?.error === "CredentialsSignin") {
+        // For both sign-up and sign-in flows, if we get CredentialsSignin,
+        // it means we need to send verification email
+        setStep({ email });
+        setError(null);
+        toast.success("Verification code sent. Check your email inbox.");
+      } else if (result?.error) {
+        setError(result.error);
+        toast.error(result.error);
+      } else if (result?.ok) {
+        toast.success("Signed in successfully");
+        router.push("/");
+      } else {
+        // Handle case where credentials are invalid but no specific error
+        setError("Invalid credentials");
+        toast.error("Invalid credentials");
+      }
+    } catch (err: any) {
+      setError(err?.message || "Authentication failed");
+      toast.error(err?.message || "Authentication failed");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleVerification = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setError(null);
+    setIsLoading(true);
+
+    const formData = new FormData(event.currentTarget);
+    const email = formData.get("email") as string;
+    const code = formData.get("code") as string;
+    const password = formData.get("password") as string;
+
+    try {
+      const result = await signIn("credentials", {
+        email,
+        code,
+        password,
+        flow: "email-verification",
+        redirect: false,
+      });
+
+      if (result?.error) {
+        setError(result.error);
+        toast.error(result.error);
+      } else if (result?.ok) {
+        toast.success("Signed in successfully");
+        router.push("/");
+      }
+    } catch (err: any) {
+      setError(err?.message || "Verification failed");
+      toast.error(err?.message || "Verification failed");
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   return step === "signIn" || step === "signUp" ? (
     <div className="relative min-h-screen">
@@ -45,16 +172,7 @@ export default function SignIn() {
             <div className="px-6 pb-6">
               <button
                 type="button"
-                onClick={() => {
-                  setError(null);
-                  setIsLoading(true);
-                  void Promise.resolve(signIn("google"))
-                    .catch((err: any) => {
-                      setError(err?.message || "Google sign-in failed");
-                      toast.error(err?.message || "Google sign-in failed");
-                    })
-                    .finally(() => setIsLoading(false));
-                }}
+                onClick={handleGoogleSignIn}
                 className="w-full inline-flex items-center justify-center gap-2 rounded-md border border-slate-200 dark:border-slate-800 px-4 py-2 text-sm font-medium bg-white dark:bg-slate-950 hover:bg-slate-50 dark:hover:bg-slate-900 transition-colors disabled:opacity-50 disabled:pointer-events-none"
                 disabled={isLoading}
               >
@@ -95,46 +213,28 @@ export default function SignIn() {
                 </div>
               </div>
 
-              <form
-                className="space-y-4"
-                onSubmit={(event) => {
-                  event.preventDefault();
-                  setError(null);
-                  setIsLoading(true);
-                  const formData = new FormData(event.currentTarget);
-                  formData.set("flow", step);
-                  void signIn("password", formData)
-                    .then(() => {
-                      setStep({ email: formData.get("email") as string });
-                      toast.success(
-                        "Verification code sent. Check your email inbox.",
-                      );
-                    })
-                    .catch((err: any) => {
-                      if (err && /verify|code|otp/i.test(err.message || "")) {
-                        setStep({ email: formData.get("email") as string });
-                        setError(null);
-                        toast.success(
-                          "Verification code sent. Check your email inbox.",
-                        );
-                      } else {
-                        setError(
-                          err?.message ||
-                            (step === "signIn"
-                              ? "Sign in failed"
-                              : "Sign up failed"),
-                        );
-                        toast.error(
-                          err?.message ||
-                            (step === "signIn"
-                              ? "Sign in failed"
-                              : "Sign up failed"),
-                        );
-                      }
-                    })
-                    .finally(() => setIsLoading(false));
-                }}
-              >
+              <form className="space-y-4" onSubmit={handleEmailAuth}>
+                {step === "signUp" && (
+                  <div className="space-y-1.5">
+                    <label
+                      htmlFor="name"
+                      className="text-sm font-medium text-foreground"
+                    >
+                      Name
+                    </label>
+                    <input
+                      id="name"
+                      className="w-full bg-background text-foreground rounded-md px-3 py-2 border border-slate-200 dark:border-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-400/40"
+                      name="name"
+                      placeholder="Your name"
+                      type="text"
+                      required
+                      disabled={isLoading}
+                      autoComplete="name"
+                    />
+                  </div>
+                )}
+
                 <div className="space-y-1.5">
                   <label
                     htmlFor="email"
@@ -287,26 +387,7 @@ export default function SignIn() {
               </p>
             </div>
             <div className="px-6 pb-6">
-              <form
-                className="space-y-4"
-                onSubmit={(event) => {
-                  event.preventDefault();
-                  setError(null);
-                  setIsLoading(true);
-                  const formData = new FormData(event.currentTarget);
-                  formData.set("flow", "email-verification");
-                  void signIn("password", formData)
-                    .then(() => {
-                      toast.success("Signed in successfully");
-                      router.push("/");
-                    })
-                    .catch((err: any) => {
-                      setError(err?.message || "Verification failed");
-                      toast.error(err?.message || "Verification failed");
-                    })
-                    .finally(() => setIsLoading(false));
-                }}
-              >
+              <form className="space-y-4" onSubmit={handleVerification}>
                 <div className="space-y-1.5">
                   <label
                     htmlFor="code"
@@ -324,6 +405,24 @@ export default function SignIn() {
                     pattern="[0-9]*"
                     required
                     disabled={isLoading}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label
+                    htmlFor="password"
+                    className="text-sm font-medium text-foreground"
+                  >
+                    Set your password
+                  </label>
+                  <input
+                    id="password"
+                    className="w-full bg-background text-foreground rounded-md px-3 py-2 border border-slate-200 dark:border-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-400/40"
+                    name="password"
+                    placeholder="••••••••"
+                    type="password"
+                    required
+                    disabled={isLoading}
+                    autoComplete="new-password"
                   />
                 </div>
                 <input

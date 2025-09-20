@@ -5,6 +5,7 @@ import { api } from "../../convex/_generated/api";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { User, Shield, Users, Crown, Briefcase } from "lucide-react";
+import { useRole } from "@/hooks/use-role";
 
 const roleIcons = {
   owner: Crown,
@@ -23,7 +24,8 @@ const roleColors = {
 };
 
 export function RoleInfo() {
-  const sessionData = useQuery(api.session.getCurrentUserSession);
+  const { authSession } = useRole();
+  const sessionData = useQuery(api.session.getCurrentUserSession, { userId: authSession?.user?.id as any });
 
   if (sessionData === undefined) {
     return (

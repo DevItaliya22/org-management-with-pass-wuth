@@ -26,7 +26,10 @@ interface HeaderProps {
 export function Header({ className }: HeaderProps = {}) {
   const pathname = usePathname();
   const roleState = useRole();
-  const myStaff = useQuery(api.staff.getMyStaff, roleState.isLoading ? (undefined as any) : ({} as any));
+  const myStaff = useQuery(
+    api.staff.getMyStaff, 
+    roleState.isLoading || !roleState.authSession?.user?.id ? "skip" : { userId: roleState.authSession.user.id as any }
+  );
   const updateMyStatus = useMutation(api.staff.updateMyStatus);
 
   // Get role information
@@ -67,9 +70,9 @@ export function Header({ className }: HeaderProps = {}) {
                     : "hover:bg-muted text-muted-foreground",
                 )}
                 onClick={async () => {
-                  if (!myStaff || myStaff.status === s) return;
+                  if (!myStaff || myStaff.status === s || !roleState.authSession?.user?.id) return;
                   try {
-                    await updateMyStatus({ status: s });
+                    await updateMyStatus({ userId: roleState.authSession.user.id as any, status: s });
                   } catch (e) {
                     console.error(e);
                   }
@@ -108,7 +111,7 @@ export function Header({ className }: HeaderProps = {}) {
                 <DropdownMenuItem
                   className={cn(myStaff?.status === "online" && "bg-muted")}
                   onClick={async () => {
-                    if (myStaff?.status !== "online") await updateMyStatus({ status: "online" });
+                    if (myStaff?.status !== "online" && roleState.authSession?.user?.id) await updateMyStatus({ userId: roleState.authSession.user.id as any, status: "online" });
                   }}
                 >
                   Online
@@ -116,7 +119,7 @@ export function Header({ className }: HeaderProps = {}) {
                 <DropdownMenuItem
                   className={cn(myStaff?.status === "paused" && "bg-muted")}
                   onClick={async () => {
-                    if (myStaff?.status !== "paused") await updateMyStatus({ status: "paused" });
+                    if (myStaff?.status !== "paused" && roleState.authSession?.user?.id) await updateMyStatus({ userId: roleState.authSession.user.id as any, status: "paused" });
                   }}
                 >
                   Paused / Break
@@ -124,7 +127,7 @@ export function Header({ className }: HeaderProps = {}) {
                 <DropdownMenuItem
                   className={cn(myStaff?.status === "offline" && "bg-muted")}
                   onClick={async () => {
-                    if (myStaff?.status !== "offline") await updateMyStatus({ status: "offline" });
+                    if (myStaff?.status !== "offline" && roleState.authSession?.user?.id) await updateMyStatus({ userId: roleState.authSession.user.id as any, status: "offline" });
                   }}
                 >
                   Offline

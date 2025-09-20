@@ -32,25 +32,26 @@ import { Id } from "@/convex/_generated/dataModel";
 import { toast } from "@/components/ui/sonner";
 
 export default function StaffManagementPage() {
-  const { isLoading, isOwner } = useRole();
+  const { isLoading, isOwner, authSession } = useRole();
 
   // Queries and mutations
   const staffMembers = useQuery(
     api.staff.getAllStaff,
-    isLoading ? (undefined as any) : ({} as any),
+    isLoading || !authSession?.user?.id ? "skip" : { userId: authSession.user.id as any }
   );
   const createStaff = useAction(api.staff.createStaffWithPassword);
   const updateStaffName = useMutation(
     api.staff.updateStaffName,
   ).withOptimisticUpdate((localStore, args) => {
-    const currentStaff = localStore.getQuery(api.staff.getAllStaff, {});
+    if (!authSession?.user?.id) return;
+    const currentStaff = localStore.getQuery(api.staff.getAllStaff, { userId: authSession.user.id as any });
     if (currentStaff !== undefined) {
-      const updatedStaff = currentStaff.map((staff) =>
+      const updatedStaff = currentStaff.map((staff: any) =>
         staff.userId === args.userId
           ? { ...staff, user: { ...staff.user, name: args.name } }
           : staff,
       );
-      localStore.setQuery(api.staff.getAllStaff, {}, updatedStaff);
+      localStore.setQuery(api.staff.getAllStaff, { userId: authSession.user.id as any }, updatedStaff);
     }
   });
 
@@ -87,7 +88,11 @@ export default function StaffManagementPage() {
         setCreateStatus("Valid email and password are required");
         return;
       }
-      await createStaff({ email: trimmedEmail, password: trimmedPassword });
+      await createStaff({ 
+        email: trimmedEmail, 
+        password: trimmedPassword,
+        ownerUserId: authSession?.user?.id as any
+      });
       setCreateStatus("Staff created successfully");
       toast.success("Staff created successfully");
       setEmail("");
@@ -251,7 +256,7 @@ export default function StaffManagementPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {staffMembers.map((staff) => (
+                {staffMembers.map((staff: any) => (
                   <TableRow key={staff._id}>
                     <TableCell className="font-medium">
                       {staff.user.name || "No name set"}

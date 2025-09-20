@@ -11,6 +11,7 @@ import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import { X } from "lucide-react";
 import Image from "next/image";
+import { useRole } from "@/hooks/use-role";
 
 type OrderChatProps = {
   orderId: string;
@@ -155,6 +156,7 @@ const MessageInput = memo(
                     sizeBytes: file.size,
                     entityType: "message",
                     entityId: undefined,
+                    userId: currentUserId!,
                   });
 
                   handleUploadProgress({
@@ -177,6 +179,7 @@ const MessageInput = memo(
             content: optimistic.content,
             attachmentFileIds:
               attachmentFileIds.length > 0 ? attachmentFileIds : undefined,
+            userId: currentUserId!,
           });
 
           if ((result as any)?.error) {

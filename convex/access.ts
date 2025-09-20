@@ -1,10 +1,9 @@
 import { internalQuery } from "./_generated/server";
 import { v } from "convex/values";
-import { getAuthUserId } from "@convex-dev/auth/server";
 import { Doc, Id } from "./_generated/dataModel";
 
 export const getViewerOrThrow = internalQuery({
-  args: {},
+  args: { userId: v.id("users") },
   returns: v.object({
     user: v.object({
       _id: v.id("users"),
@@ -13,12 +12,8 @@ export const getViewerOrThrow = internalQuery({
       ),
     }),
   }),
-  handler: async (ctx) => {
-    const userId = await getAuthUserId(ctx);
-    if (!userId) {
-      throw new Error("Not authenticated");
-    }
-    const user = await ctx.db.get(userId);
+  handler: async (ctx, args) => {
+    const user = await ctx.db.get(args.userId);
     if (!user) {
       throw new Error("User not found");
     }

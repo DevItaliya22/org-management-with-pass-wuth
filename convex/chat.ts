@@ -1,11 +1,10 @@
 import { query, mutation } from "./_generated/server";
 import { v } from "convex/values";
-import { getAuthUserId } from "@convex-dev/auth/server";
+// Removed Convex Auth import - authentication handled by NextAuth.js
 import { Doc, Id } from "./_generated/dataModel";
 
 // Helper to ensure viewer and load minimal user
-async function requireViewer(ctx: any) {
-  const userId = await getAuthUserId(ctx);
+async function requireViewer(ctx: any, userId: Id<"users">) {
   if (!userId) throw new Error("Not authenticated");
   const user = await ctx.db.get(userId);
   if (!user) throw new Error("User not found");
@@ -74,7 +73,7 @@ async function checkReadAccess(
 }
 
 export const getChatMessages = query({
-  args: { chatId: v.id("chats") },
+  args: { chatId: v.id("chats"), userId: v.id("users") },
   returns: v.union(
     v.null(),
     v.object({
@@ -102,7 +101,7 @@ export const getChatMessages = query({
     }),
   ),
   handler: async (ctx, args) => {
-    const { userId } = await requireViewer(ctx);
+    const { userId } = await requireViewer(ctx, args.userId);
 
     const chat = await ctx.db.get(args.chatId);
     if (!chat) return null;
@@ -144,13 +143,14 @@ export const sendMessage = mutation({
     chatId: v.id("chats"),
     content: v.optional(v.string()),
     attachmentFileIds: v.optional(v.array(v.id("files"))),
+    userId: v.id("users"),
   },
   returns: v.union(
     v.object({ messageId: v.id("messages") }),
     v.object({ error: v.string() }),
   ),
   handler: async (ctx, args) => {
-    const { userId } = await requireViewer(ctx);
+    const { userId } = await requireViewer(ctx, args.userId);
 
     // Verify the order exists and user has write access
     const hasWriteAccess = await checkWriteAccess(ctx, userId, args.orderId);
@@ -210,10 +210,10 @@ export const sendMessage = mutation({
 
 // Helper mutation to get or create a chat for an order
 export const getOrCreateChat = mutation({
-  args: { orderId: v.id("orders") },
+  args: { orderId: v.id("orders"), userId: v.id("users") },
   returns: v.object({ chatId: v.id("chats") }),
   handler: async (ctx, args) => {
-    const { userId } = await requireViewer(ctx);
+    const { userId } = await requireViewer(ctx, args.userId);
 
     // Check if user has read access to the order
     const hasReadAccess = await checkReadAccess(ctx, userId, args.orderId);
@@ -245,10 +245,10 @@ export const getOrCreateChat = mutation({
 
 // Generate upload URL for file uploads
 export const generateUploadUrl = mutation({
-  args: {},
+  args: { userId: v.id("users") },
   returns: v.string(),
-  handler: async (ctx) => {
-    const { userId } = await requireViewer(ctx);
+  handler: async (ctx, args) => {
+    const { userId } = await requireViewer(ctx, args.userId);
     // Any authenticated user can generate upload URLs
     return await ctx.storage.generateUploadUrl();
   },
@@ -267,10 +267,11 @@ export const saveUploadedFile = mutation({
       v.literal("fulfilment"),
     ),
     entityId: v.optional(v.string()),
+    userId: v.id("users"),
   },
   returns: v.id("files"),
   handler: async (ctx, args) => {
-    const { userId } = await requireViewer(ctx);
+    const { userId } = await requireViewer(ctx, args.userId);
 
     const now = Date.now();
 
@@ -307,10 +308,10 @@ export const saveUploadedFile = mutation({
 
 // Get file download URL
 export const getFileUrl = query({
-  args: { fileId: v.id("files") },
+  args: { fileId: v.id("files"), userId: v.id("users") },
   returns: v.union(v.string(), v.null()),
   handler: async (ctx, args) => {
-    const { userId } = await requireViewer(ctx);
+    const { userId } = await requireViewer(ctx, args.userId);
 
     const file = await ctx.db.get(args.fileId);
     if (!file) {

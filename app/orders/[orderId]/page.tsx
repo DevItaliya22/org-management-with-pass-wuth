@@ -43,6 +43,7 @@ export default function OrderDetailsPage() {
     isResellerAdmin,
     isResellerMember,
     isStaff,
+    authSession,
   } = useRole();
   const [ready, setReady] = useState(false);
   const [allowed, setAllowed] = useState<boolean | null>(null);
@@ -62,7 +63,7 @@ export default function OrderDetailsPage() {
     api.orders.getOrderById,
     orderId ? ({ orderId } as any) : "skip",
   );
-  const session = useQuery(api.session.getCurrentUserSession, {});
+  const session = useQuery(api.session.getCurrentUserSession, { userId: authSession?.user?.id as any });
   const currentUserId = session?.user?._id as string | undefined;
   const currentUserRole = session?.user?.role as
     | "owner"
@@ -145,12 +146,14 @@ export default function OrderDetailsPage() {
           await fixAndCompleteDispute({
             disputeId: selectedDispute._id,
             resolutionNotes: resolutionNotes.trim() || undefined,
+            userId: authSession?.user?.id as any,
           });
           break;
         case "decline":
           await declineAndCompleteDispute({
             disputeId: selectedDispute._id,
             resolutionNotes: resolutionNotes.trim(),
+            userId: authSession?.user?.id as any,
           });
           break;
         case "partial":
@@ -158,6 +161,7 @@ export default function OrderDetailsPage() {
             disputeId: selectedDispute._id,
             adjustmentAmountUsd: parseFloat(adjustmentAmount),
             resolutionNotes: resolutionNotes.trim() || undefined,
+            userId: authSession?.user?.id as any,
           });
           break;
       }
@@ -288,7 +292,7 @@ export default function OrderDetailsPage() {
               onClick={async () => {
                 try {
                   setCompleting(true);
-                  await completeOrder({ orderId: order._id });
+                  await completeOrder({ orderId: order._id, userId: authSession?.user?.id as any });
                   router.refresh();
                 } finally {
                   setCompleting(false);

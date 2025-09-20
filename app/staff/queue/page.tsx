@@ -44,7 +44,7 @@ import { Eye } from "lucide-react";
 import { toast } from "@/components/ui/sonner";
 
 export default function StaffQueuePage() {
-  const { isLoading, isStaff } = useRole();
+  const { isLoading, isStaff, authSession } = useRole();
   const isMobile = useIsMobile();
   const [view, setView] = useState<"kanban" | "list">("kanban");
   const [lane, setLane] = useState<
@@ -54,13 +54,13 @@ export default function StaffQueuePage() {
     api.orders.staffInQueue,
     isLoading
       ? (undefined as any)
-      : { paginationOpts: { numItems: 50, cursor: null } },
+      : { paginationOpts: { numItems: 50, cursor: null }, userId: authSession?.user?.id as any },
   );
   const myWork = useQuery(
     api.orders.listMyWork,
     isLoading
       ? (undefined as any)
-      : { paginationOpts: { numItems: 50, cursor: null } },
+      : { paginationOpts: { numItems: 50, cursor: null }, userId: authSession?.user?.id as any },
   );
 
   const pick = useMutation(api.orders.pickOrder);
@@ -71,7 +71,7 @@ export default function StaffQueuePage() {
   const submitFulfilment = useMutation(api.orders.submitFulfilment);
   const myStaff = useQuery(
     api.staff.getMyStaff,
-    isLoading ? (undefined as any) : ({} as any),
+    isLoading ? (undefined as any) : { userId: authSession?.user?.id as any },
   );
   const canAct = myStaff?.status === "online";
 
@@ -138,8 +138,8 @@ export default function StaffQueuePage() {
       }
 
       if (lane === "queue" && targetLane === "in_progress") {
-        await pick({ orderId });
-        await start({ orderId });
+        await pick({ orderId, userId: authSession?.user?.id as any });
+        await start({ orderId, userId: authSession?.user?.id as any });
         toast.success("Order started");
         return;
       }
@@ -149,12 +149,12 @@ export default function StaffQueuePage() {
         return;
       }
       if (lane === "in_progress" && targetLane === "on_hold") {
-        await hold({ orderId, reason: "Moved to hold" });
+        await hold({ orderId, reason: "Moved to hold", userId: authSession?.user?.id as any });
         toast.success("Order put on hold");
         return;
       }
       if (lane === "on_hold" && targetLane === "in_progress") {
-        await resume({ orderId });
+        await resume({ orderId, userId: authSession?.user?.id as any });
         toast.success("Order resumed");
         return;
       }
@@ -580,8 +580,8 @@ export default function StaffQueuePage() {
                       return;
                     }
                     if (from === "queue" && to === "in_progress") {
-                      await pick({ orderId: id as any });
-                      await start({ orderId: id as any });
+                      await pick({ orderId: id as any, userId: authSession?.user?.id as any });
+                      await start({ orderId: id as any, userId: authSession?.user?.id as any });
                       toast.success("Order started");
                     } else if (from === "queue" && (to === "on_hold" || to === "fulfil_submitted")) {
                       // Disallow direct moves from queue to on_hold or fulfil_submitted
@@ -592,10 +592,11 @@ export default function StaffQueuePage() {
                       await hold({
                         orderId: id as any,
                         reason: holdReason.trim(),
+                        userId: authSession?.user?.id as any,
                       });
                       toast.success("Order put on hold");
                     } else if (from === "on_hold" && to === "in_progress") {
-                      await resume({ orderId: id as any });
+                      await resume({ orderId: id as any, userId: authSession?.user?.id as any });
                       toast.success("Order resumed");
                     } else if (
                       from === "in_progress" &&
@@ -614,6 +615,7 @@ export default function StaffQueuePage() {
                         nameOnOrder: nameOnOrder.trim(),
                         finalValueUsd: finalVal,
                         proofFileIds: [],
+                        userId: authSession?.user?.id as any,
                       });
                       toast.success("Fulfilment submitted");
                     } else if (
@@ -633,6 +635,7 @@ export default function StaffQueuePage() {
                         nameOnOrder: nameOnOrder.trim(),
                         finalValueUsd: finalVal,
                         proofFileIds: [],
+                        userId: authSession?.user?.id as any,
                       });
                       toast.success("Fulfilment submitted");
                     }
@@ -696,7 +699,7 @@ export default function StaffQueuePage() {
                 onClick={async () => {
                   try {
                     if (!pendingMove?.id) return;
-                    await pass({ orderId: pendingMove.id as any, reason: passReason.trim() });
+                    await pass({ orderId: pendingMove.id as any, reason: passReason.trim(), userId: authSession?.user?.id as any });
                     toast.success("Order passed");
                   } catch (e: any) {
                     toast.error(e?.message || "Failed to pass order");

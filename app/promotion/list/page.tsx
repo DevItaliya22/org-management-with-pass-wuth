@@ -19,7 +19,7 @@ import {
 } from "@/components/ui/table";
 
 export default function PromotionRequestsPage() {
-  const { isLoading, isOwner } = useRole();
+  const { isLoading, isOwner, authSession } = useRole();
   const requests = useQuery(
     api.teams.listPromotionRequests,
     isLoading ? (undefined as any) : ({} as any),
@@ -61,7 +61,7 @@ export default function PromotionRequestsPage() {
                           className="bg-green-600 text-white hover:bg-green-600"
                           onClick={async () => {
                             try {
-                              await review({ requestId: r._id, approve: true });
+                              await review({ requestId: r._id, approve: true, userId: authSession?.user?.id as any });
                               toast.success("Promotion request approved");
                             } catch (e: any) {
                               toast.error(e?.message ?? "Failed to approve");
@@ -75,7 +75,7 @@ export default function PromotionRequestsPage() {
                           variant="destructive"
                           onClick={async () => {
                             try {
-                              await review({ requestId: r._id, approve: false });
+                              await review({ requestId: r._id, approve: false, userId: authSession?.user?.id as any });
                               toast.success("Promotion request rejected");
                             } catch (e: any) {
                               toast.error(e?.message ?? "Failed to reject");

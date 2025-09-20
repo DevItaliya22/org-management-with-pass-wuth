@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { useRouter } from "next/navigation";
+import { useRole } from "@/hooks/use-role";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -25,6 +26,7 @@ export default function OwnerPermissions({
   order,
 }: OwnerPermissionsProps) {
   const router = useRouter();
+  const { authSession } = useRole();
   const updateReadAccess = useMutation(api.orders.updateOrderReadAccess);
   const updateWriteAccess = useMutation(api.orders.updateOrderWriteAccess);
 
@@ -36,9 +38,12 @@ export default function OwnerPermissions({
   const [initialWriteUsers, setInitialWriteUsers] = useState<string[]>([]);
 
   // Owner-side: only staff and owners (non-reseller users)
-  const members = useQuery(api.orders.getOwnerSideMembersForPermissions, {
-    orderId: orderId as any,
-  });
+  const members = useQuery(api.orders.getOwnerSideMembersForPermissions, 
+    authSession?.user?.id ? {
+      orderId: orderId as any,
+      userId: authSession.user.id as any,
+    } : "skip"
+  );
 
   // Initialize selected users when members data loads
   useEffect(() => {
@@ -74,10 +79,12 @@ export default function OwnerPermissions({
         updateReadAccess({
           orderId: orderId as any,
           userIds: selectedReadUsers as any,
+          userId: authSession?.user?.id as any,
         }),
         updateWriteAccess({
           orderId: orderId as any,
           userIds: selectedWriteUsers as any,
+          userId: authSession?.user?.id as any,
         }),
       ]);
       router.refresh();

@@ -34,7 +34,7 @@ import Link from "next/link";
 import { toast } from "@/components/ui/sonner";
 
 export default function TeamManagementPage() {
-  const { isLoading, isResellerAdmin, session } = useRole();
+  const { isLoading, isResellerAdmin, session, authSession } = useRole();
   const isAdmin = isResellerAdmin;
   const team = session?.team;
   const [name, setName] = useState(team?.name ?? "");
@@ -46,7 +46,7 @@ export default function TeamManagementPage() {
   const updateMemberStatus = useMutation(api.teams.updateMemberStatus);
   const teamMembers = useQuery(
     api.teams.getTeamMembers,
-    team?._id ? { teamId: team._id } : "skip",
+    team?._id ? { teamId: team._id, userId: authSession?.user?.id as any } : "skip",
   );
 
   if (isLoading) return null;
@@ -57,7 +57,7 @@ export default function TeamManagementPage() {
     if (!team?._id) return;
     setIsUpdating(true);
     try {
-      await updateTeam({ teamId: team._id, name, slug });
+      await updateTeam({ teamId: team._id, name, slug, userId: authSession?.user?.id as any });
       toast.success("Team updated successfully");
       setIsEditModalOpen(false);
     } catch (err: any) {
@@ -76,6 +76,7 @@ export default function TeamManagementPage() {
       await updateMemberStatus({
         memberId,
         [field]: value,
+        userId: authSession?.user?.id as any,
       });
       toast.success("Member status updated");
     } catch (err: any) {

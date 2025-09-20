@@ -1,23 +1,32 @@
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
-import { authTables } from "@convex-dev/auth/server";
 
-// The schema is normally optional, but Convex Auth
-// requires indexes defined on `authTables`.
-// The schema provides more precise TypeScript types.
 export default defineSchema({
-  ...authTables,
   users: defineTable({
     name: v.optional(v.string()),
     image: v.optional(v.string()),
     email: v.string(),
     emailVerificationTime: v.optional(v.number()),
+    passwordHash: v.optional(v.string()),
+    googleId: v.optional(v.string()),
     role: v.optional(
       v.union(v.literal("owner"), v.literal("reseller"), v.literal("staff")),
     ),
   })
     .index("email", ["email"])
-    .index("by_role", ["role"]),
+    .index("by_role", ["role"])
+    .index("by_google_id", ["googleId"]),
+
+  // OTP verification codes
+  otpCodes: defineTable({
+    email: v.string(),
+    code: v.string(),
+    expiresAt: v.number(),
+    used: v.boolean(),
+    createdAt: v.number(),
+  })
+    .index("by_email", ["email"])
+    .index("by_code", ["code"]),
 
   // Put reseller table here nd assign role in auth.ts
   teams: defineTable({

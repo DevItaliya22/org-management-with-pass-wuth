@@ -4,6 +4,7 @@ import { useState, useRef } from "react";
 import { useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { useRouter } from "next/navigation";
+import { useRole } from "@/hooks/use-role";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -28,6 +29,7 @@ export default function FulfilmentSubmitDialog({
   onOpenChange,
 }: Props) {
   const router = useRouter();
+  const { authSession } = useRole();
   const submitFulfilment = useMutation(api.orders.submitFulfilment);
   const generateUploadUrl = useMutation(api.chat.generateUploadUrl);
   const saveUploadedFile = useMutation(api.chat.saveUploadedFile);
@@ -69,7 +71,7 @@ export default function FulfilmentSubmitDialog({
         const file = files[index];
         const key = `${file.name}-${file.size}-${index}`;
         setUploadProgress((p) => ({ ...p, [key]: 10 }));
-        const postUrl = await generateUploadUrl();
+        const postUrl = await generateUploadUrl({ userId: authSession?.user?.id as any });
         setUploadProgress((p) => ({ ...p, [key]: 50 }));
         const result = await fetch(postUrl, {
           method: "POST",
@@ -84,6 +86,7 @@ export default function FulfilmentSubmitDialog({
           sizeBytes: file.size,
           entityType: "fulfilment",
           entityId: undefined,
+          userId: authSession?.user?.id as any,
         });
         uploadedIds.push(fileId as unknown as string);
         setUploadProgress((p) => ({ ...p, [key]: 100 }));
@@ -117,6 +120,7 @@ export default function FulfilmentSubmitDialog({
         nameOnOrder: nameOnOrder.trim(),
         finalValueUsd: val,
         proofFileIds: (proofFileIds as any) ?? [],
+        userId: authSession?.user?.id as any,
       });
       resetAndClose();
       router.refresh();

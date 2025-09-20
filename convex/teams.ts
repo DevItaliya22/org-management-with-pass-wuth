@@ -2,7 +2,7 @@ import { mutation, internalMutation, query } from "./_generated/server";
 import { v } from "convex/values";
 import { Id } from "./_generated/dataModel";
 import { generateRandomTeamName } from "./lib/teamNames";
-import { getAuthUserId } from "@convex-dev/auth/server";
+// Removed Convex Auth import - authentication handled by NextAuth.js
 import { internal } from "./_generated/api";
 
 // Create a new team with random name
@@ -104,10 +104,11 @@ export const reviewPromotionRequest = mutation({
     requestId: v.id("adminPromotionRequests"),
     approve: v.boolean(),
     reviewNotes: v.optional(v.string()),
+    userId: v.id("users"),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const reviewerUserId = await getAuthUserId(ctx);
+    const reviewerUserId = args.userId;
     if (!reviewerUserId) throw new Error("Not authenticated");
 
     const req = await ctx.db.get(args.requestId);
@@ -149,10 +150,11 @@ export const reviewPromotionRequest = mutation({
 export const requestPromotion = mutation({
   args: {
     teamId: v.id("teams"),
+    userId: v.id("users"),
   },
   returns: v.id("adminPromotionRequests"),
   handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx);
+    const userId = args.userId;
     if (!userId) throw new Error("Not authenticated");
 
     // Prevent duplicate pending requests
@@ -266,7 +268,7 @@ export const listPromotionRequests = query({
 
 // Reseller: List my promotion requests with team names
 export const listMyPromotionRequests = query({
-  args: {},
+  args: { userId: v.id("users") },
   returns: v.array(
     v.object({
       _id: v.id("adminPromotionRequests"),
@@ -281,8 +283,8 @@ export const listMyPromotionRequests = query({
       ),
     }),
   ),
-  handler: async (ctx) => {
-    const userId = await getAuthUserId(ctx);
+  handler: async (ctx, args) => {
+    const userId = args.userId;
     if (!userId) return [];
     const rows = await ctx.db
       .query("adminPromotionRequests")
@@ -316,10 +318,11 @@ export const inviteToTeam = mutation({
   args: {
     teamId: v.id("teams"),
     invitedEmail: v.string(),
+    userId: v.id("users"),
   },
   returns: v.id("teamInvitationRequests"),
   handler: async (ctx, args) => {
-    const inviterId = await getAuthUserId(ctx);
+    const inviterId = args.userId;
     if (!inviterId) throw new Error("Not authenticated");
 
     // Ensure inviter is admin of the team
@@ -423,7 +426,7 @@ export const listTeamInvitations = query({
 
 // List invitations for current user by email
 export const listMyInvitations = query({
-  args: {},
+  args: { userId: v.id("users") },
   returns: v.array(
     v.object({
       _creationTime: v.number(),
@@ -446,8 +449,8 @@ export const listMyInvitations = query({
       invitationToken: v.string(),
     }),
   ),
-  handler: async (ctx) => {
-    const userId = await getAuthUserId(ctx);
+  handler: async (ctx, args) => {
+    const userId = args.userId;
     if (!userId) return [];
     const user = await ctx.db.get(userId);
     if (!user) return [];
@@ -499,10 +502,10 @@ export const listMyInvitations = query({
 
 // Accept invitation
 export const acceptInvitation = mutation({
-  args: { invitationId: v.id("teamInvitationRequests") },
+  args: { invitationId: v.id("teamInvitationRequests"), userId: v.id("users") },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx);
+    const userId = args.userId;
     if (!userId) throw new Error("Not authenticated");
     const invite = await ctx.db.get(args.invitationId);
     if (!invite) throw new Error("Invitation not found");
@@ -560,10 +563,10 @@ export const acceptInvitation = mutation({
 
 // Reject invitation
 export const rejectInvitation = mutation({
-  args: { invitationId: v.id("teamInvitationRequests") },
+  args: { invitationId: v.id("teamInvitationRequests"), userId: v.id("users") },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx);
+    const userId = args.userId;
     if (!userId) throw new Error("Not authenticated");
     const invite = await ctx.db.get(args.invitationId);
     if (!invite) throw new Error("Invitation not found");
@@ -584,10 +587,11 @@ export const updateTeam = mutation({
     teamId: v.id("teams"),
     name: v.string(),
     slug: v.optional(v.string()),
+    userId: v.id("users"),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx);
+    const userId = args.userId;
     if (!userId) throw new Error("Not authenticated");
     const membership = await ctx.db
       .query("resellerMembers")
@@ -611,7 +615,7 @@ export const updateTeam = mutation({
 
 // Get team members with user details (admin only)
 export const getTeamMembers = query({
-  args: { teamId: v.id("teams") },
+  args: { teamId: v.id("teams"), userId: v.id("users") },
   returns: v.array(
     v.object({
       _id: v.id("resellerMembers"),
@@ -645,7 +649,7 @@ export const getTeamMembers = query({
     }),
   ),
   handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx);
+    const userId = args.userId;
     if (!userId) throw new Error("Not authenticated");
 
     // Check if user is admin of this team
@@ -698,10 +702,11 @@ export const updateMemberStatus = mutation({
     memberId: v.id("resellerMembers"),
     isActive: v.optional(v.boolean()),
     isBlocked: v.optional(v.boolean()),
+    userId: v.id("users"),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx);
+    const userId = args.userId;
     if (!userId) throw new Error("Not authenticated");
 
     // Get the member record
@@ -735,7 +740,7 @@ export const updateMemberStatus = mutation({
 
 // Get user details for team admin (admin only)
 export const getUserDetails = query({
-  args: { userId: v.id("users") },
+  args: { userId: v.id("users"), currentUserId: v.id("users") },
   returns: v.union(
     v.object({
       _id: v.id("users"),
@@ -765,7 +770,7 @@ export const getUserDetails = query({
     v.null(),
   ),
   handler: async (ctx, args) => {
-    const currentUserId = await getAuthUserId(ctx);
+    const currentUserId = args.currentUserId;
     if (!currentUserId) throw new Error("Not authenticated");
 
     // Get the user details

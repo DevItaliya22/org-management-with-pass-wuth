@@ -27,7 +27,7 @@ import { Button } from "@/components/ui/button";
 import { Inbox } from "lucide-react";
 
 export default function PromotionPage() {
-  const { isLoading, isResellerDefaultMember, session } = useRole();
+  const { isLoading, isResellerDefaultMember, session, authSession } = useRole();
 
   const [ready, setReady] = useState(false);
   const [canView, setCanView] = useState<boolean | null>(null);
@@ -45,7 +45,7 @@ export default function PromotionPage() {
 
   const myRequests = useQuery(
     api.teams.listMyPromotionRequests,
-    ready ? {} : undefined,
+    ready && authSession?.user?.id ? { userId: authSession.user.id as any } : "skip",
   );
   const requestPromotion = useMutation(api.teams.requestPromotion);
 
@@ -56,7 +56,7 @@ export default function PromotionPage() {
     if (!teamId) return;
     try {
       setIsSubmitting(true);
-      await requestPromotion({ teamId });
+      await requestPromotion({ teamId, userId: authSession?.user?.id as any });
       toast.success("Request sent");
       setConfirmOpen(false);
     } catch (error) {

@@ -14,14 +14,12 @@ import type {
   FunctionReference,
 } from "convex/server";
 import type * as access from "../access.js";
-import type * as auth from "../auth.js";
 import type * as chat from "../chat.js";
 import type * as crons from "../crons.js";
 import type * as files from "../files.js";
 import type * as http from "../http.js";
 import type * as lib_teamNames from "../lib/teamNames.js";
 import type * as orders from "../orders.js";
-import type * as otp_NodemailerOTP from "../otp/NodemailerOTP.js";
 import type * as otp_sendEmailAction from "../otp/sendEmailAction.js";
 import type * as session from "../session.js";
 import type * as staff from "../staff.js";
@@ -39,14 +37,12 @@ import type * as users from "../users.js";
  */
 declare const fullApi: ApiFromModules<{
   access: typeof access;
-  auth: typeof auth;
   chat: typeof chat;
   crons: typeof crons;
   files: typeof files;
   http: typeof http;
   "lib/teamNames": typeof lib_teamNames;
   orders: typeof orders;
-  "otp/NodemailerOTP": typeof otp_NodemailerOTP;
   "otp/sendEmailAction": typeof otp_sendEmailAction;
   session: typeof session;
   staff: typeof staff;

@@ -22,7 +22,7 @@ interface UserDetailPageProps {
 }
 
 export default function UserDetailPage({ params }: UserDetailPageProps) {
-  const { isLoading, isResellerAdmin, isOwner, session } = useRole();
+  const { isLoading, isResellerAdmin, isOwner, session, authSession } = useRole();
 
   const [isUpdating, setIsUpdating] = useState(false);
   const [editingName, setEditingName] = useState(false);
@@ -40,7 +40,7 @@ export default function UserDetailPage({ params }: UserDetailPageProps) {
   const updateUserName = useMutation(api.users.updateUserName);
   const userDetails = useQuery(
     api.teams.getUserDetails,
-    resolvedParams ? { userId: resolvedParams.userId as Id<"users"> } : "skip",
+    resolvedParams ? { userId: resolvedParams.userId as Id<"users">, currentUserId: authSession?.user?.id as any } : "skip",
   );
 
   // Sync editable name value when details load/change
@@ -61,6 +61,7 @@ export default function UserDetailPage({ params }: UserDetailPageProps) {
       await updateMemberStatus({
         memberId: userDetails.resellerMember._id,
         [field]: value,
+        userId: authSession?.user?.id as any,
       });
       toast.success("Status updated successfully");
     } catch (err: any) {
@@ -183,7 +184,7 @@ export default function UserDetailPage({ params }: UserDetailPageProps) {
                           }
                           setIsUpdating(true);
                           try {
-                            await updateUserName({ name: trimmed });
+                            await updateUserName({ name: trimmed, userId: authSession?.user?.id as any });
                             toast.success("Name updated");
                             setEditingName(false);
                           } catch (err: any) {
