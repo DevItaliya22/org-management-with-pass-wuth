@@ -1,4 +1,11 @@
-import { mutation, query, internalMutation, internalAction, internalQuery, action } from "./_generated/server";
+import {
+  mutation,
+  query,
+  internalMutation,
+  internalAction,
+  internalQuery,
+  action,
+} from "./_generated/server";
 import { v } from "convex/values";
 import { internal } from "./_generated/api";
 import { Id } from "./_generated/dataModel";
@@ -32,9 +39,11 @@ export const getByEmail = query({
       emailVerificationTime: v.optional(v.float64()),
       passwordHash: v.optional(v.string()),
       googleId: v.optional(v.string()),
-      role: v.optional(v.union(v.literal("owner"), v.literal("reseller"), v.literal("staff"))),
+      role: v.optional(
+        v.union(v.literal("owner"), v.literal("reseller"), v.literal("staff")),
+      ),
     }),
-    v.null()
+    v.null(),
   ),
   handler: async (ctx: any, args: any) => {
     return await ctx.db
@@ -89,7 +98,7 @@ export const sendVerificationEmail = mutation({
     const code = Math.floor(100000 + Math.random() * 900000).toString();
     const now = Date.now();
     const expiresAt = now + 10 * 60 * 1000; // 10 minutes from now
-    
+
     // Check if user exists
     const user = await ctx.db
       .query("users")
@@ -97,7 +106,7 @@ export const sendVerificationEmail = mutation({
       .first();
 
     if (!user) {
-      throw new Error("User not found");
+      throw new Error("User not found. Please sign up first.");
     }
 
     // Mark any existing OTP codes for this email as used
@@ -126,7 +135,7 @@ export const sendVerificationEmail = mutation({
       code,
       expires: new Date(expiresAt).toISOString(),
     });
-    
+
     return { success: true };
   },
 });
@@ -147,23 +156,25 @@ export const verifyEmailCode = mutation({
       emailVerificationTime: v.optional(v.float64()),
       passwordHash: v.optional(v.string()),
       googleId: v.optional(v.string()),
-      role: v.optional(v.union(v.literal("owner"), v.literal("reseller"), v.literal("staff"))),
+      role: v.optional(
+        v.union(v.literal("owner"), v.literal("reseller"), v.literal("staff")),
+      ),
     }),
-    v.null()
+    v.null(),
   ),
   handler: async (ctx: any, args: any) => {
     const now = Date.now();
-    
+
     // Find the OTP code
     const otpCode = await ctx.db
       .query("otpCodes")
       .withIndex("by_email", (q: any) => q.eq("email", args.email))
-      .filter((q: any) => 
+      .filter((q: any) =>
         q.and(
           q.eq(q.field("code"), args.code),
           q.eq(q.field("used"), false),
-          q.gt(q.field("expiresAt"), now)
-        )
+          q.gt(q.field("expiresAt"), now),
+        ),
       )
       .first();
 
@@ -197,7 +208,7 @@ export const verifyEmailCode = mutation({
 
     // Update the user
     await ctx.db.patch(user._id, updateData);
-    
+
     return user;
   },
 });
@@ -238,19 +249,18 @@ export const createStaffUser = internalMutation({
 });
 
 // Create a new user with email/password (for sign-up)
-export const createUserWithPassword = mutation({
+export const createUserWithPassword = action({
   args: {
     email: v.string(),
     password: v.string(),
     name: v.optional(v.string()),
   },
   returns: v.id("users"),
-  handler: async (ctx: any, args: any) => {
+  handler: async (ctx: any, args: any): Promise<Id<"users">> => {
     // Check if user already exists
-    const existingUser = await ctx.db
-      .query("users")
-      .withIndex("email", (q: any) => q.eq("email", args.email))
-      .first();
+    const existingUser = await ctx.runQuery(internal.users.getUserByEmail, {
+      email: args.email,
+    });
 
     if (existingUser) {
       throw new Error("User with this email already exists");
@@ -260,12 +270,15 @@ export const createUserWithPassword = mutation({
     const passwordHash = await bcrypt.hash(args.password, 12);
 
     // Create the user
-    const userId = await ctx.db.insert("users", {
-      email: args.email,
-      name: args.name,
-      passwordHash,
-      role: "reseller", // Default role for new users
-    });
+    const userId: Id<"users"> = await ctx.runMutation(
+      internal.users.createUserWithPasswordInternal,
+      {
+        email: args.email,
+        name: args.name,
+        passwordHash,
+        role: "reseller", // Default role for new users
+      },
+    );
 
     return userId;
   },
@@ -288,13 +301,15 @@ export const verifyEmailCodeAction = action({
       emailVerificationTime: v.optional(v.float64()),
       passwordHash: v.optional(v.string()),
       googleId: v.optional(v.string()),
-      role: v.optional(v.union(v.literal("owner"), v.literal("reseller"), v.literal("staff"))),
+      role: v.optional(
+        v.union(v.literal("owner"), v.literal("reseller"), v.literal("staff")),
+      ),
     }),
-    v.null()
+    v.null(),
   ),
   handler: async (ctx: any, args: any): Promise<any> => {
     const now = Date.now();
-    
+
     // Find the OTP code
     const otpCode = await ctx.runQuery(internal.users.getOtpCode, {
       email: args.email,
@@ -335,7 +350,7 @@ export const verifyEmailCodeAction = action({
       userId: user._id,
       updateData,
     });
-    
+
     return user;
   },
 });
@@ -356,20 +371,20 @@ export const getOtpCode = internalQuery({
       used: v.boolean(),
       createdAt: v.float64(),
     }),
-    v.null()
+    v.null(),
   ),
   handler: async (ctx: any, args: any) => {
     const now = Date.now();
-    
+
     return await ctx.db
       .query("otpCodes")
       .withIndex("by_email", (q: any) => q.eq("email", args.email))
-      .filter((q: any) => 
+      .filter((q: any) =>
         q.and(
           q.eq(q.field("code"), args.code),
           q.eq(q.field("used"), false),
-          q.gt(q.field("expiresAt"), now)
-        )
+          q.gt(q.field("expiresAt"), now),
+        ),
       )
       .first();
   },
@@ -400,9 +415,11 @@ export const getUserByEmail = internalQuery({
       emailVerificationTime: v.optional(v.float64()),
       passwordHash: v.optional(v.string()),
       googleId: v.optional(v.string()),
-      role: v.optional(v.union(v.literal("owner"), v.literal("reseller"), v.literal("staff"))),
+      role: v.optional(
+        v.union(v.literal("owner"), v.literal("reseller"), v.literal("staff")),
+      ),
     }),
-    v.null()
+    v.null(),
   ),
   handler: async (ctx: any, args: any) => {
     return await ctx.db
@@ -421,5 +438,30 @@ export const updateUser = internalMutation({
   handler: async (ctx: any, args: any) => {
     await ctx.db.patch(args.userId, args.updateData);
     return null;
+  },
+});
+
+export const createUserWithPasswordInternal = internalMutation({
+  args: {
+    email: v.string(),
+    name: v.optional(v.string()),
+    passwordHash: v.string(),
+    role: v.union(
+      v.literal("owner"),
+      v.literal("reseller"),
+      v.literal("staff"),
+    ),
+  },
+  returns: v.id("users"),
+  handler: async (ctx: any, args: any) => {
+    // Create the user
+    const userId = await ctx.db.insert("users", {
+      email: args.email,
+      name: args.name,
+      passwordHash: args.passwordHash,
+      role: args.role,
+    });
+
+    return userId;
   },
 });
