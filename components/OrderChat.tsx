@@ -137,7 +137,9 @@ const MessageInput = memo(
                 try {
                   // Step 1: Generate upload URL
                   handleUploadProgress({ ...uploadProgress, [fileKey]: 10 });
-                  const postUrl = await generateUploadUrl();
+                  const postUrl = await generateUploadUrl({
+                    userId: currentUserId!,
+                  });
 
                   // Step 2: Upload file to Convex storage
                   handleUploadProgress({ ...uploadProgress, [fileKey]: 50 });
@@ -341,18 +343,24 @@ export default function OrderChat({
     Array<OptimisticMessage>
   >([]);
 
+  // Get user session and role information
+  const { authSession } = useRole();
+  const currentUserId = authSession?.user?.id as Id<"users"> | undefined;
+
   // Get or create chat for this order
   const getOrCreateChat = useMutation(api.chat.getOrCreateChat);
 
   // Get chat messages
   const chatData = useQuery(
     api.chat.getChatMessages,
-    chatId ? { chatId } : "skip",
+    chatId && currentUserId ? { chatId, userId: currentUserId } : "skip",
   );
 
   // Get current user to determine message alignment
-  const session = useQuery(api.session.getCurrentUserSession, {});
-  const currentUserId = session?.user?._id as Id<"users"> | undefined;
+  const session = useQuery(
+    api.session.getCurrentUserSession,
+    currentUserId ? { userId: currentUserId } : "skip",
+  );
 
   // Callback functions for MessageInput
   const handleMessageSent = useCallback(() => {
@@ -484,8 +492,11 @@ export default function OrderChat({
 
   // Initialize chat when component mounts
   useEffect(() => {
-    if (orderId && !chatId) {
-      getOrCreateChat({ orderId: orderId as Id<"orders"> })
+    if (orderId && !chatId && currentUserId) {
+      getOrCreateChat({
+        orderId: orderId as Id<"orders">,
+        userId: currentUserId,
+      })
         .then((result) => {
           setChatId(result.chatId);
         })
@@ -493,7 +504,7 @@ export default function OrderChat({
           console.error("Failed to get or create chat:", error);
         });
     }
-  }, [orderId, chatId, getOrCreateChat]);
+  }, [orderId, chatId, currentUserId, getOrCreateChat]);
 
   // Reconcile optimistic messages once the server message appears
   useEffect(() => {

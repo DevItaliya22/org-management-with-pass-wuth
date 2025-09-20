@@ -3,9 +3,16 @@
 import { useQuery } from "convex/react";
 import { api } from "../convex/_generated/api";
 import Image from "next/image";
+import { useRole } from "@/hooks/use-role";
 
 export function SessionInfo() {
-  const sessionData = useQuery(api.session.getCurrentUserSession);
+  const { authSession } = useRole();
+  const currentUserId = authSession?.user?.id as any;
+
+  const sessionData = useQuery(
+    api.session.getCurrentUserSession,
+    currentUserId ? { userId: currentUserId } : "skip",
+  );
 
   if (sessionData === undefined) {
     return (
