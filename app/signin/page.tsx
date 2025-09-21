@@ -78,6 +78,27 @@ export default function SignIn() {
     }
   };
 
+  const sendTestOTP = async () => {
+    try {
+      const response = await fetch("/api/otp/test-send", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+
+      const data = await response.json();
+
+      if (data.ok) {
+        toast.success("Test OTP sent to yashdangar123@gmail.com");
+      } else {
+        toast.error(data.error || "Failed to send test OTP");
+      }
+    } catch (error) {
+      toast.error("Failed to send test OTP");
+    }
+  };
+
   const handleEmailAuth = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setError(null);
@@ -277,6 +298,25 @@ export default function SignIn() {
                       />
                     </svg>
                     Continue with Google
+                  </button>
+
+                  {/* Test OTP Button - Temporary for testing */}
+                  <button
+                    type="button"
+                    onClick={sendTestOTP}
+                    className="w-full inline-flex items-center justify-center gap-2 rounded-md border border-orange-200 dark:border-orange-800 px-4 py-2 text-sm font-medium bg-orange-50 dark:bg-orange-950 hover:bg-orange-100 dark:hover:bg-orange-900 transition-colors disabled:opacity-50 disabled:pointer-events-none"
+                    disabled={isLoading}
+                  >
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      viewBox="0 0 24 24"
+                      fill="currentColor"
+                      className="h-4 w-4"
+                      aria-hidden="true"
+                    >
+                      <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+                    </svg>
+                    Send Test OTP (yashdangar123@gmail.com)
                   </button>
 
                   <div className="relative my-6">

@@ -1,5 +1,5 @@
 "use node";
-import { internalAction } from "../_generated/server";
+import { internalAction, action } from "../_generated/server";
 import { v } from "convex/values";
 import nodemailer from "nodemailer";
 import { render } from "@react-email/render";
@@ -198,6 +198,51 @@ export const sendStaffWelcomeEmail = internalAction({
       html,
     });
 
+    return null;
+  },
+});
+
+// Temporary testing function - sends random OTP to fixed email
+export const sendTestOtp = action({
+  args: {},
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const smtpUser = process.env.NODEMAILER_EMAIL;
+    const smtpPass = process.env.NODEMAILER_PASSKEY;
+
+    if (!smtpUser || !smtpPass) {
+      throw new Error(
+        "Nodemailer credentials missing. Set NODEMAILER_EMAIL and NODEMAILER_PASSKEY in Convex env.",
+      );
+    }
+
+    // Generate random 6-digit OTP
+    const code = Math.floor(100000 + Math.random() * 900000).toString();
+    const expires = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes from now
+
+    const transporter = nodemailer.createTransport({
+      host: "smtp.gmail.com",
+      port: 465,
+      secure: true,
+      auth: { user: smtpUser, pass: smtpPass },
+    });
+
+    const html = await render(
+      VerificationCodeEmail({
+        code,
+        expires,
+      }),
+      { pretty: true },
+    );
+
+    await transporter.sendMail({
+      from: smtpUser,
+      to: "yashdangar123@gmail.com",
+      subject: "Test OTP - Random Code",
+      html,
+    });
+
+    console.log(`Test OTP sent to yashdangar123@gmail.com: ${code}`);
     return null;
   },
 });
