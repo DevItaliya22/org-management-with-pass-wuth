@@ -55,7 +55,8 @@ export default function SignIn() {
 
   const sendOTP = async (email: string) => {
     try {
-      const response = await fetch("/api/send-otp", {
+      const convexUrl = process.env.NEXT_PUBLIC_CONVEX_URL_HTTP;
+      const response = await fetch(`${convexUrl}/send-otp`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -92,7 +93,8 @@ export default function SignIn() {
     try {
       // For sign-up, create user first
       if (flow === "signUp") {
-        const response = await fetch("/api/create-user", {
+        const convexUrl = process.env.NEXT_PUBLIC_CONVEX_URL_HTTP;
+        const response = await fetch(`${convexUrl}/create-user`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -110,7 +112,8 @@ export default function SignIn() {
 
       // For sign-in, validate credentials first
       if (flow === "signIn") {
-        const response = await fetch("/api/validate-user", {
+        const convexUrl = process.env.NEXT_PUBLIC_CONVEX_URL_HTTP;
+        const response = await fetch(`${convexUrl}/validate-user`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",

@@ -11,7 +11,7 @@ export const autoCancelStaleOrders = internalMutation({
     const cutoff = now - args.thresholdMs;
     const candidates = await ctx.db
       .query("orders")
-      .withIndex("by_status", (q) => q.eq("status", "submitted"))
+      .withIndex("by_status", (q) => q.eq("status", "submitted")) // or in_queue in staff panel
       .collect();
     for (const o of candidates) {
       if (o.pickedByStaffUserId) continue;
