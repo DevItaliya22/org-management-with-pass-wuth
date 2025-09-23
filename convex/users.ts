@@ -355,6 +355,80 @@ export const verifyEmailCodeAction = action({
   },
 });
 
+// Send password reset OTP (reuses otpCodes)
+export const sendPasswordResetEmail = mutation({
+  args: { email: v.string() },
+  returns: v.object({ success: v.boolean() }),
+  handler: async (ctx: any, args: any) => {
+    const user = await ctx.db
+      .query("users")
+      .withIndex("email", (q: any) => q.eq("email", args.email))
+      .first();
+
+    // Return success regardless to avoid email enumeration
+    if (!user) return { success: true };
+
+    const code = Math.floor(100000 + Math.random() * 900000).toString();
+    const now = Date.now();
+    const expiresAt = now + 10 * 60 * 1000;
+
+    const existingOtps = await ctx.db
+      .query("otpCodes")
+      .withIndex("by_email", (q: any) => q.eq("email", args.email))
+      .filter((q: any) => q.eq(q.field("used"), false))
+      .collect();
+    for (const otp of existingOtps) {
+      await ctx.db.patch(otp._id, { used: true });
+    }
+
+    await ctx.db.insert("otpCodes", {
+      email: args.email,
+      code,
+      expiresAt,
+      used: false,
+      createdAt: now,
+    });
+
+    await ctx.scheduler.runAfter(0, internal.otp.sendEmailAction.sendOtpEmail, {
+      email: args.email,
+      code,
+      expires: new Date(expiresAt).toISOString(),
+    });
+
+    return { success: true };
+  },
+});
+
+// Reset password using OTP code
+export const resetPasswordWithOtp = action({
+  args: { email: v.string(), code: v.string(), newPassword: v.string() },
+  returns: v.object({ success: v.boolean() }),
+  handler: async (ctx: any, args: any) => {
+    const otp = await ctx.runQuery(internal.users.getOtpCode, {
+      email: args.email,
+      code: args.code,
+    });
+    if (!otp) {
+      throw new Error("Invalid or expired verification code");
+    }
+
+    await ctx.runMutation(internal.users.markOtpAsUsed, { otpId: otp._id });
+
+    const user = await ctx.runQuery(internal.users.getUserByEmail, {
+      email: args.email,
+    });
+    if (!user) return { success: true };
+
+    const passwordHash = await bcrypt.hash(args.newPassword, 12);
+    await ctx.runMutation(internal.users.updateUser, {
+      userId: user._id,
+      updateData: { passwordHash },
+    });
+
+    return { success: true };
+  },
+});
+
 // Helper queries and mutations for the action
 export const getOtpCode = internalQuery({
   args: {

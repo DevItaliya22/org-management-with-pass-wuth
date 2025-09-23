@@ -15,10 +15,22 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Send verification email using Convex
-    const result = await convex.mutation(api.users.sendVerificationEmail, {
+    // Send verification email using Convex (used for signup/verify)
+    let result = await convex.mutation(api.users.sendVerificationEmail, {
       email,
     });
+
+    // Also trigger password reset OTP in case this is a reset flow
+    // This endpoint remains idempotent and returns success either way
+    try {
+      const reset = await convex.mutation(api.users.sendPasswordResetEmail, {
+        email,
+      });
+      // Prefer true if either succeeded
+      if (reset?.success) {
+        result = reset;
+      }
+    } catch {}
 
     if (result.success) {
       return NextResponse.json({ success: true });

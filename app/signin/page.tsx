@@ -8,10 +8,13 @@ import { toast } from "@/components/ui/sonner";
 export default function SignIn() {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
-  const [step, setStep] = useState<"signIn" | "signUp" | "verify">("signIn");
+  const [step, setStep] = useState<
+    "signIn" | "signUp" | "verify" | "resetRequest" | "resetConfirm"
+  >("signIn");
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [email, setEmail] = useState("");
+  const [resetEmail, setResetEmail] = useState("");
 
   useEffect(() => {
     // Check if user is already signed in
@@ -48,6 +51,66 @@ export default function SignIn() {
       }
     } catch (err: any) {
       toast.error(err?.message || "Google sign-in failed");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleRequestPasswordReset = async (
+    event: React.FormEvent<HTMLFormElement>,
+  ) => {
+    event.preventDefault();
+    setIsLoading(true);
+    try {
+      const formData = new FormData(event.currentTarget);
+      const reqEmail = (formData.get("email") as string) || resetEmail;
+      if (!reqEmail) {
+        toast.error("Email is required");
+        return;
+      }
+      const response = await fetch("/api/request-password-reset", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: reqEmail }),
+      });
+      const data = await response.json();
+      if (data.success) {
+        setResetEmail(reqEmail);
+        toast.success("If an account exists, an OTP was sent to your email");
+        setStep("resetConfirm");
+      } else {
+        toast.error(data.error || "Failed to send reset code");
+      }
+    } catch (err: any) {
+      toast.error("Failed to send reset code");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleConfirmPasswordReset = async (
+    event: React.FormEvent<HTMLFormElement>,
+  ) => {
+    event.preventDefault();
+    setIsLoading(true);
+    try {
+      const formData = new FormData(event.currentTarget);
+      const code = formData.get("code") as string;
+      const newPassword = formData.get("newPassword") as string;
+      const response = await fetch("/api/reset-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: resetEmail, code, newPassword }),
+      });
+      const data = await response.json();
+      if (data.success) {
+        toast.success("Password reset successful. Please sign in.");
+        setStep("signIn");
+      } else {
+        toast.error(data.error || "Invalid code or request");
+      }
+    } catch (err: any) {
+      toast.error("Reset failed. Please try again.");
     } finally {
       setIsLoading(false);
     }
@@ -218,14 +281,22 @@ export default function SignIn() {
                   ? "Verify your email"
                   : step === "signIn"
                     ? "Welcome back"
-                    : "Create your account"}
+                    : step === "signUp"
+                      ? "Create your account"
+                      : step === "resetRequest"
+                        ? "Reset your password"
+                        : "Set new password"}
               </h1>
               <p className="text-sm text-muted-foreground mt-1">
                 {step === "verify"
                   ? "Enter the verification code sent to your inbox"
                   : step === "signIn"
                     ? "Log in to continue to your dashboard"
-                    : "Sign up to get started"}
+                    : step === "signUp"
+                      ? "Sign up to get started"
+                      : step === "resetRequest"
+                        ? "Enter your email to receive a reset code"
+                        : "Enter the code and your new password"}
               </p>
             </div>
             <div className="px-6 pb-6">
@@ -266,9 +337,132 @@ export default function SignIn() {
                     Cancel
                   </button>
                 </form>
+              ) : step === "resetRequest" ? (
+                <form className="space-y-4" onSubmit={handleRequestPasswordReset}>
+                  <div className="space-y-1.5">
+                    <label
+                      htmlFor="reset-email"
+                      className="text-sm font-medium text-foreground"
+                    >
+                      Email
+                    </label>
+                    <input
+                      id="reset-email"
+                      className="w-full bg-background text-foreground rounded-md px-3 py-2 border border-slate-200 dark:border-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-400/40"
+                      name="email"
+                      placeholder="you@example.com"
+                      type="email"
+                      required
+                      disabled={isLoading}
+                      defaultValue={resetEmail}
+                      autoComplete="email"
+                    />
+                  </div>
+                  <button
+                    className="w-full inline-flex items-center justify-center rounded-md bg-foreground text-background px-4 py-2 text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50 disabled:pointer-events-none"
+                    type="submit"
+                    disabled={isLoading}
+                  >
+                    {isLoading ? "Sending…" : "Send reset code"}
+                  </button>
+                  <button
+                    className="w-full inline-flex items-center justify-center rounded-md border border-slate-200 dark:border-slate-800 px-4 py-2 text-sm font-medium hover:bg-slate-50 dark:hover:bg-slate-900 transition-colors disabled:opacity-50 disabled:pointer-events-none"
+                    type="button"
+                    onClick={() => setStep("signIn")}
+                    disabled={isLoading}
+                  >
+                    Back to sign in
+                  </button>
+                </form>
+              ) : step === "resetConfirm" ? (
+                <form className="space-y-4" onSubmit={handleConfirmPasswordReset}>
+                  <div className="space-y-1.5">
+                    <label
+                      htmlFor="reset-code"
+                      className="text-sm font-medium text-foreground"
+                    >
+                      Reset code
+                    </label>
+                    <input
+                      id="reset-code"
+                      className="w-full bg-background text-foreground rounded-md px-3 py-2 border border-slate-200 dark:border-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-400/40"
+                      name="code"
+                      placeholder="123456"
+                      type="text"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      required
+                      disabled={isLoading}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label
+                      htmlFor="newPassword"
+                      className="text-sm font-medium text-foreground"
+                    >
+                      New password
+                    </label>
+                    <div className="relative">
+                      <input
+                        id="newPassword"
+                        className="w-full bg-background text-foreground rounded-md px-3 py-2 border border-slate-200 dark:border-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-400/40 pr-10"
+                        name="newPassword"
+                        placeholder="••••••••"
+                        type={showPassword ? "text" : "password"}
+                        required
+                        disabled={isLoading}
+                        autoComplete="new-password"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword((v) => !v)}
+                        className="absolute inset-y-0 right-0 px-3 text-muted-foreground hover:text-foreground"
+                        aria-label={showPassword ? "Hide password" : "Show password"}
+                        tabIndex={-1}
+                      >
+                        {showPassword ? (
+                          <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            viewBox="0 0 24 24"
+                            fill="currentColor"
+                            className="w-5 h-5"
+                          >
+                            <path d="M3.53 2.47a.75.75 0 0 0-1.06 1.06l2.201 2.2A11.64 11.64 0 0 0 1.732 12C3.06 16.412 7.272 20 12 20c1.97 0 3.812-.53 5.39-1.46l3.08 3.08a.75.75 0 0 0 1.06-1.06L3.53 2.47zM12 18.5c-4.014 0-7.62-3.056-8.806-6.5a10.107 10.107 0 0 1 2.597-3.864l2.302 2.301A4.75 4.75 0 0 0 12 16.75a4.73 4.73 0 0 0 2.036-.454l1.143 1.143A8.973 8.973 0 0 1 12 18.5zm2.333-3.52-1.13-1.13a3.25 3.25 0 0 1-3.553-3.553l-1.13-1.13a4.75 4.75 0  0 0 5.812 5.812z" />
+                            <path d="M14.876 9.123 17.79 12.037a8.97 8.97 0  0 0 1.016-1.538C17.94 6.588 13.728 3 9 3a10.07 10.07 0  0 0-4.39 1.46l1.286 1.286A8.973 8.973 0  0 1 9 4.5c4.014 0 7.62 3.056 8.806 6.5a10.107 10.107 0  0 1-1.016 1.538l-1.914-1.914A4.75 4.75 0  0 0 9 7.25c-.72 0-1.398.17-2.004.472l1.143 1.143A3.25 3.25 0  0 1 12 8.75c.79 0 1.527.27 2.11.73l.066-.357z" />
+                          </svg>
+                        ) : (
+                          <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            viewBox="0 0 24 24"
+                            fill="currentColor"
+                            className="w-5 h-5"
+                          >
+                            <path d="M12 5c-5.088 0-9.3 3.588-10.268 8 .968 4.412 5.18 8 10.268 8s9.3-3.588 10.268-8C21.3 8.588 17.088 5 12 5zm0 13.5c-4.014 0-7.62-3.056-8.806-6.5C4.38 8.056 7.986 5 12 5s7.62 3.056 8.806 6.5C19.62 14.444 16.014 18.5 12 18.5z" />
+                            <path d="M12 8.75A3.25 3.25 0 1 0 12 15.25 3.25 3.25 0  0 0 12 8.75z" />
+                          </svg>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                  <button
+                    className="w-full inline-flex items-center justify-center rounded-md bg-foreground text-background px-4 py-2 text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50 disabled:pointer-events-none"
+                    type="submit"
+                    disabled={isLoading}
+                  >
+                    {isLoading ? "Resetting…" : "Reset password"}
+                  </button>
+                  <button
+                    className="w-full inline-flex items-center justify-center rounded-md border border-slate-200 dark:border-slate-800 px-4 py-2 text-sm font-medium hover:bg-slate-50 dark:hover:bg-slate-900 transition-colors disabled:opacity-50 disabled:pointer-events-none"
+                    type="button"
+                    onClick={() => setStep("signIn")}
+                    disabled={isLoading}
+                  >
+                    Back to sign in
+                  </button>
+                </form>
               ) : (
                 <>
-                  <button
+                    <button
                     type="button"
                     onClick={handleGoogleSignIn}
                     className="w-full inline-flex items-center justify-center gap-2 rounded-md border border-slate-200 dark:border-slate-800 px-4 py-2 text-sm font-medium bg-white dark:bg-slate-950 hover:bg-slate-50 dark:hover:bg-slate-900 transition-colors disabled:opacity-50 disabled:pointer-events-none"
@@ -452,6 +646,15 @@ export default function SignIn() {
                             disabled={isLoading}
                           >
                             Sign up
+                          </button>
+                          <span className="mx-2">·</span>
+                          <button
+                            type="button"
+                            className="text-foreground underline hover:no-underline"
+                            onClick={() => setStep("resetRequest")}
+                            disabled={isLoading}
+                          >
+                            Forgot password?
                           </button>
                         </>
                       ) : (
