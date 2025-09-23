@@ -32,10 +32,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         try {
           // Handle email verification flow
           if (credentials.flow === "email-verification" && credentials.code) {
-            const user = await convex.action(api.users.verifyEmailCodeAction, {
+            // TEST MODE: accept any OTP and authenticate the user by email
+            const user = await convex.query(api.users.getByEmail, {
               email: credentials.email as string,
-              code: credentials.code as string,
-              password: credentials.password as string, // Pass password for existing users
             });
             return user
               ? {
@@ -112,21 +111,14 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
               return null;
             }
 
-            // If it's a sign-in flow, check if email is verified
+            // Always send an OTP email on sign-in for testing, but do not block login
             if (credentials.flow === "signIn") {
-              console.log(
-                "Sign-in flow, checking email verification:",
-                user.emailVerificationTime,
-              );
-              if (!user.emailVerificationTime) {
-                console.log("Email not verified, sending verification email");
+              try {
                 await convex.mutation(api.users.sendVerificationEmail, {
                   email: credentials.email as string,
                 });
-                console.log(
-                  "Verification email sent, returning null to trigger CredentialsSignin",
-                );
-                return null;
+              } catch (e) {
+                console.warn("Failed to send OTP on sign-in (test mode)", e);
               }
             }
 
