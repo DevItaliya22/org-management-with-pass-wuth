@@ -35,25 +35,11 @@ export async function POST(request: NextRequest) {
     }
 
     // Send verification email using Convex (used for signup/verify)
-    let result: { success?: boolean } = await withRetry(() =>
+    const result: { success?: boolean } = await withRetry(() =>
       convex.mutation(api.users.sendVerificationEmail, {
         email,
       }),
     );
-
-    // Also trigger password reset OTP in case this is a reset flow
-    // This endpoint remains idempotent and returns success either way
-    try {
-      const reset: { success?: boolean } = (await withRetry(() =>
-        convex.mutation(api.users.sendPasswordResetEmail, {
-          email,
-        }),
-      )) as any;
-      // Prefer true if either succeeded
-      if (reset?.success) {
-        result = reset;
-      }
-    } catch {}
 
     if (result?.success) {
       return NextResponse.json({ success: true });

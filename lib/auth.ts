@@ -49,20 +49,20 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         if (!credentials?.email) return null;
 
         try {
-          // Handle email verification flow
+          // Handle email verification flow (strict: validate OTP with Convex)
           if (credentials.flow === "email-verification" && credentials.code) {
-            // TEST MODE: accept any OTP and authenticate the user by email
-            const user = await withRetry(() =>
-              convex.query(api.users.getByEmail, {
+            const verifiedUser = await withRetry(() =>
+              convex.action(api.users.verifyEmailCodeAction, {
                 email: credentials.email as string,
+                code: credentials.code as string,
               }),
             );
-            return user
+            return verifiedUser
               ? {
-                  id: user._id,
-                  email: user.email,
-                  name: user.name,
-                  role: user.role,
+                  id: verifiedUser._id,
+                  email: verifiedUser.email,
+                  name: verifiedUser.name,
+                  role: verifiedUser.role,
                 }
               : null;
           }
@@ -140,29 +140,20 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
               return null;
             }
 
-            // Always send an OTP email on sign-in for testing, but do not block login
+            // Require OTP on sign-in: send OTP then return null to force verification step
             if (credentials.flow === "signIn") {
               try {
                 await convex.mutation(api.users.sendVerificationEmail, {
                   email: credentials.email as string,
                 });
               } catch (e) {
-                console.warn("Failed to send OTP on sign-in (test mode)", e);
+                console.warn("Failed to send OTP on sign-in", e);
               }
+              return null;
             }
 
-            console.log("Authentication successful, returning user:", {
-              id: user._id,
-              email: user.email,
-              name: user.name,
-              role: user.role,
-            });
-            return {
-              id: user._id,
-              email: user.email,
-              name: user.name,
-              role: user.role,
-            };
+            // If not an OTP-requiring flow, return null by default
+            return null;
           }
 
           return null;
