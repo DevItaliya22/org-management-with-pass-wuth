@@ -59,10 +59,6 @@ export default function OrderDetailsPage() {
   const orderId = params?.orderId as string | undefined;
   const router = useRouter();
 
-  const order = useQuery(
-    api.orders.getOrderById,
-    orderId ? ({ orderId } as any) : "skip",
-  );
   const session = useQuery(api.session.getCurrentUserSession, { userId: authSession?.user?.id as any });
   const currentUserId = session?.user?._id as string | undefined;
   const currentUserRole = session?.user?.role as
@@ -70,6 +66,10 @@ export default function OrderDetailsPage() {
     | "staff"
     | "reseller"
     | undefined;
+  const order = useQuery(
+    api.orders.getOrderById,
+    orderId && currentUserId ? ({ orderId, userId: currentUserId } as any) : "skip",
+  );
   const disputes = useQuery(
     api.orders.getDisputesByOrder,
     orderId ? ({ orderId } as any) : "skip",
@@ -801,7 +801,7 @@ function AttachmentFile({ fileId }: { fileId: string }) {
 
   if (!file) {
     return (
-      <div className="flex items-center gap-2 p-2 bg-gray-50 rounded-md text-sm">
+      <div className="flex items-center gap-2 p-2 bg-muted rounded-md text-sm border border-border/50">
         <File className="h-4 w-4 text-gray-500" />
         <span className="text-muted-foreground">Loading file...</span>
       </div>
@@ -831,7 +831,7 @@ function AttachmentFile({ fileId }: { fileId: string }) {
 
   return (
     <>
-      <div className="flex items-center justify-between p-2 bg-gray-50 rounded-md text-sm">
+      <div className="flex items-center justify-between p-2 bg-muted rounded-md text-sm border border-border/50">
         <div className="flex items-center gap-2 min-w-0 flex-1">
           <File className="h-4 w-4 text-gray-500 flex-shrink-0" />
           <div className="min-w-0 flex-1">

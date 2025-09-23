@@ -41,7 +41,7 @@ export default function TeamInvitationsPage() {
     isLoading
       ? (undefined as any)
       : teamId
-        ? { teamId, status: undefined, userId: authSession?.user?.id as any }
+        ? { teamId, status: undefined }
         : ("skip" as any),
   );
 

@@ -170,7 +170,7 @@ export default function StaffQueuePage() {
   const myOrders = myWork?.page ?? [];
   const columns = [
     { id: "queue", name: "In Queue" },
-    { id: "in_progress", name: "In Progress" },
+    { id: "in_progress", name: "Now Working" },
     { id: "on_hold", name: "On Hold" },
     { id: "fulfil_submitted", name: "Fulfilment Submitted" },
   ];
@@ -205,9 +205,19 @@ export default function StaffQueuePage() {
         <div className="flex items-center justify-between gap-3 mb-4">
           <h1 className="text-lg font-semibold">My Work</h1>
           <Tabs value={view} onValueChange={(v) => setView(v as any)}>
-            <TabsList className="grid grid-cols-2">
-              <TabsTrigger value="kanban">Kanban</TabsTrigger>
-              <TabsTrigger value="list">List</TabsTrigger>
+            <TabsList className="grid grid-cols-2 gap-1 bg-transparent p-0">
+              <TabsTrigger
+                value="kanban"
+                className="text-foreground data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+              >
+                Kanban
+              </TabsTrigger>
+              <TabsTrigger
+                value="list"
+                className="text-foreground data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+              >
+                List
+              </TabsTrigger>
             </TabsList>
           </Tabs>
         </div>
@@ -233,6 +243,12 @@ export default function StaffQueuePage() {
               toast.error("Move to In Progress first");
               return;
             }
+            // Open fulfilment modal directly when moving to fulfil_submitted
+            if (to === "fulfil_submitted") {
+              setFulfilOrderId(active.id as string);
+              setFulfilDialogOpen(true);
+              return;
+            }
             setPendingMove({ id: active.id as string, from, to });
             setConfirmOpen(true);
           }}
@@ -242,7 +258,7 @@ export default function StaffQueuePage() {
                 <KanbanHeader>{col.name}</KanbanHeader>
                 <KanbanCards id={col.id}>
                   {(item: any) => (
-                    <KanbanCard id={item.id} name={item.name} column={col.id}>
+                    <KanbanCard key={item.id} id={item.id} name={item.name} column={col.id}>
                       <div className="flex items-center justify-between gap-2">
                         <div className="font-medium text-sm truncate">
                           {item._raw?.merchant}
@@ -315,7 +331,7 @@ export default function StaffQueuePage() {
                                 setDialogContext("listStart");
                               }}
                             >
-                              Start
+                              Pick
                             </Button>
                             <Button
                               size="sm"
@@ -333,26 +349,26 @@ export default function StaffQueuePage() {
                         )}
                       {lane === "in_progress" && (
                         <>
-                          <Button
+                      <Button
                             size="sm"
                             variant="secondary"
                             disabled={!canAct}
                             onClick={() => {
                               if (!canAct) { toast.error("You are not online."); return; }
-                              setPendingMove({ id: item.id as string, from: "in_progress", to: "on_hold" });
-                              setConfirmOpen(true);
+                          setPendingMove({ id: item.id as string, from: "in_progress", to: "on_hold" });
+                          setConfirmOpen(true);
                             }}
                           >
                             Hold
                           </Button>
-                          <Button
+                      <Button
                             size="sm"
-                            disabled={!canAct}
-                            onClick={() => {
-                              if (!canAct) { toast.error("You are not online."); return; }
-                              setPendingMove({ id: item.id as string, from: "in_progress", to: "fulfil_submitted" });
-                              setConfirmOpen(true);
-                            }}
+                        disabled={!canAct}
+                        onClick={() => {
+                          if (!canAct) { toast.error("You are not online."); return; }
+                          setFulfilOrderId(item.id as string);
+                          setFulfilDialogOpen(true);
+                        }}
                           >
                             Submit Fulfilment
                           </Button>
@@ -376,8 +392,8 @@ export default function StaffQueuePage() {
                             disabled={!canAct}
                             onClick={() => {
                               if (!canAct) { toast.error("You are not online."); return; }
-                              setPendingMove({ id: item.id as string, from: "on_hold", to: "fulfil_submitted" });
-                              setConfirmOpen(true);
+                              setFulfilOrderId(item.id as string);
+                              setFulfilDialogOpen(true);
                             }}
                           >
                             Submit Fulfilment
@@ -392,9 +408,13 @@ export default function StaffQueuePage() {
           ) : (
             <div className={cn(!canAct && "pointer-events-none opacity-60")}> 
             <Tabs defaultValue="queue">
-              <TabsList className="w-full grid grid-cols-4">
+              <TabsList className="w-full grid grid-cols-4 gap-1 bg-transparent p-1 border rounded-md">
                 {columns.map((c) => (
-                  <TabsTrigger key={c.id} value={c.id as any}>
+                  <TabsTrigger
+                    key={c.id}
+                    value={c.id as any}
+                    className="text-foreground data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded"
+                  >
                     <span className="truncate">{c.name}</span>
                     <Badge className="ml-2" variant={c.id === "queue" ? "secondary" : "outline"}>
                       {grouped[c.id]?.length ?? 0}
@@ -439,7 +459,7 @@ export default function StaffQueuePage() {
                                   setDialogContext("listStart");
                                 }}
                               >
-                                Start
+                                Pick
                               </Button>
                               <Button
                                 size="sm"
@@ -468,8 +488,8 @@ export default function StaffQueuePage() {
                               <Button
                                 size="sm"
                                 onClick={() => {
-                                  setPendingMove({ id: item.id as string, from: "in_progress", to: "fulfil_submitted" });
-                                  setConfirmOpen(true);
+                                  setFulfilOrderId(item.id as string);
+                                  setFulfilDialogOpen(true);
                                 }}
                               >
                                 Submit Fulfilment
@@ -490,8 +510,8 @@ export default function StaffQueuePage() {
                               <Button
                                 size="sm"
                                 onClick={() => {
-                                  setPendingMove({ id: item.id as string, from: "on_hold", to: "fulfil_submitted" });
-                                  setConfirmOpen(true);
+                                  setFulfilOrderId(item.id as string);
+                                  setFulfilDialogOpen(true);
                                 }}
                               >
                                 Submit Fulfilment

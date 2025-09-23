@@ -63,7 +63,7 @@ export function Sidebar({ className }: SidebarProps) {
     });
   } else {
     if (!isLoading && isResellerAdmin) {
-      items.push({ name: "Edit Team Name", href: "/team/edit", icon: Users });
+      items.push({ name: "Team Management", href: "/team/edit", icon: Users });
       items.push({
         name: "Team Invitations",
         href: "/team/invitations",
