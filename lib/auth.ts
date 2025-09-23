@@ -7,6 +7,25 @@ import { api, internal } from "@/convex/_generated/api";
 
 const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
 
+async function withRetry<T>(fn: () => Promise<T>, attempts = 3): Promise<T> {
+  let lastError: unknown;
+  for (let i = 0; i < attempts; i++) {
+    try {
+      return await fn();
+    } catch (err: any) {
+      lastError = err;
+      const isTimeout =
+        err?.code === "ETIMEDOUT" || err?.cause?.code === "ETIMEDOUT";
+      if (i < attempts - 1 && isTimeout) {
+        await new Promise((r) => setTimeout(r, 200 * (i + 1)));
+        continue;
+      }
+      break;
+    }
+  }
+  throw lastError;
+}
+
 export const { handlers, auth, signIn, signOut } = NextAuth({
   providers: [
     Google({
@@ -33,9 +52,11 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           // Handle email verification flow
           if (credentials.flow === "email-verification" && credentials.code) {
             // TEST MODE: accept any OTP and authenticate the user by email
-            const user = await convex.query(api.users.getByEmail, {
-              email: credentials.email as string,
-            });
+            const user = await withRetry(() =>
+              convex.query(api.users.getByEmail, {
+                email: credentials.email as string,
+              }),
+            );
             return user
               ? {
                   id: user._id,
@@ -52,17 +73,21 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             if (credentials.flow === "signUp") {
               console.log("Creating user for sign-up:", credentials.email);
               // Create the user first using action
-              await convex.action(api.users.createUserWithPassword, {
-                email: credentials.email as string,
-                password: credentials.password as string,
-                name: credentials.name as string,
-              });
+              await withRetry(() =>
+                convex.action(api.users.createUserWithPassword, {
+                  email: credentials.email as string,
+                  password: credentials.password as string,
+                  name: credentials.name as string,
+                }),
+              );
 
               console.log("Sending verification email to:", credentials.email);
               // Then send verification email
-              await convex.mutation(api.users.sendVerificationEmail, {
-                email: credentials.email as string,
-              });
+              await withRetry(() =>
+                convex.mutation(api.users.sendVerificationEmail, {
+                  email: credentials.email as string,
+                }),
+              );
               console.log(
                 "Verification email sent, returning null to trigger CredentialsSignin",
               );
@@ -71,9 +96,11 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
             // For sign-in flow, get the user
             console.log("Getting user by email:", credentials.email);
-            const user = await convex.query(api.users.getByEmail, {
-              email: credentials.email as string,
-            });
+            const user = await withRetry(() =>
+              convex.query(api.users.getByEmail, {
+                email: credentials.email as string,
+              }),
+            );
             console.log(
               "User found:",
               user ? "Yes" : "No",
@@ -90,9 +117,11 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
               console.log(
                 "User exists but no password hash, sending verification email to set up password",
               );
-              await convex.mutation(api.users.sendVerificationEmail, {
-                email: credentials.email as string,
-              });
+              await withRetry(() =>
+                convex.mutation(api.users.sendVerificationEmail, {
+                  email: credentials.email as string,
+                }),
+              );
               console.log(
                 "Verification email sent for password setup, returning null",
               );
@@ -170,21 +199,22 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       if (account?.provider === "google") {
         try {
           // Check if user exists in Convex
-          const existingUser = await convex.query(api.users.getByEmail, {
-            email: user.email!,
-          });
+          const existingUser = await withRetry(() =>
+            convex.query(api.users.getByEmail, {
+              email: user.email!,
+            }),
+          );
 
           if (!existingUser) {
             console.log("Creating new Google user:", user.email);
             // Create new user with Google profile
-            const newUserId = await convex.mutation(
-              api.users.createFromGoogle,
-              {
+            const newUserId = await withRetry(() =>
+              convex.mutation(api.users.createFromGoogle, {
                 email: user.email!,
                 name: user.name || "",
                 image: user.image || "",
                 googleId: account.providerAccountId,
-              },
+              }),
             );
             // Update the user object with the new ID
             user.id = newUserId;

@@ -4,6 +4,25 @@ import { api } from "@/convex/_generated/api";
 
 const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
 
+async function withRetry<T>(fn: () => Promise<T>, attempts = 3): Promise<T> {
+  let lastError: unknown;
+  for (let i = 0; i < attempts; i++) {
+    try {
+      return await fn();
+    } catch (err: any) {
+      lastError = err;
+      const isTimeout =
+        err?.code === "ETIMEDOUT" || err?.cause?.code === "ETIMEDOUT";
+      if (i < attempts - 1 && isTimeout) {
+        await new Promise((r) => setTimeout(r, 200 * (i + 1)));
+        continue;
+      }
+      break;
+    }
+  }
+  throw lastError;
+}
+
 export async function POST(request: NextRequest) {
   try {
     const { email } = await request.json();
@@ -16,23 +35,27 @@ export async function POST(request: NextRequest) {
     }
 
     // Send verification email using Convex (used for signup/verify)
-    let result = await convex.mutation(api.users.sendVerificationEmail, {
-      email,
-    });
+    let result: { success?: boolean } = await withRetry(() =>
+      convex.mutation(api.users.sendVerificationEmail, {
+        email,
+      }),
+    );
 
     // Also trigger password reset OTP in case this is a reset flow
     // This endpoint remains idempotent and returns success either way
     try {
-      const reset = await convex.mutation(api.users.sendPasswordResetEmail, {
-        email,
-      });
+      const reset: { success?: boolean } = (await withRetry(() =>
+        convex.mutation(api.users.sendPasswordResetEmail, {
+          email,
+        }),
+      )) as any;
       // Prefer true if either succeeded
       if (reset?.success) {
         result = reset;
       }
     } catch {}
 
-    if (result.success) {
+    if (result?.success) {
       return NextResponse.json({ success: true });
     } else {
       return NextResponse.json(
