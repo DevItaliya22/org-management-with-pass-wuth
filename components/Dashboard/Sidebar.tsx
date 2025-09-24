@@ -12,8 +12,10 @@ interface SidebarProps {
 
 export function Sidebar({ className }: SidebarProps) {
   const pathname = usePathname();
-  const { isLoading, isOwner, isStaff, isResellerAdmin, isResellerMember ,isResellerDefaultMember} =
+  const { isLoading, isOwner, isStaff, isResellerAdmin, isResellerMember ,isResellerDefaultMember, session } =
     useRole();
+
+  const canCreateOrder = (session?.resellerMember as any)?.canCreateOrder === true;
 
   const items: Array<{ name: string; href: string; icon: any }> = [
     {
@@ -63,7 +65,7 @@ export function Sidebar({ className }: SidebarProps) {
     });
   } else {
     if (!isLoading && isResellerAdmin) {
-      items.push({ name: "Team Management", href: "/team/edit", icon: Users });
+      items.push({ name: "Team Management", href: "/team/management", icon: Users });
       items.push({
         name: "Team Invitations",
         href: "/team/invitations",
@@ -74,11 +76,13 @@ export function Sidebar({ className }: SidebarProps) {
         href: "/orders",
         icon: Users,
       });
-      items.push({
-        name: "Create Order",
-        href: "/orders/new",
-        icon: Plus,
-      });
+      if (canCreateOrder) {
+        items.push({
+          name: "Create Order",
+          href: "/orders/new",
+          icon: Plus,
+        });
+      }
     } else if (!isLoading && isResellerMember) {
       // items.push({ name: "Promotion", href: "/promotion", icon: ShieldCheck });
       items.push({
@@ -91,11 +95,13 @@ export function Sidebar({ className }: SidebarProps) {
         href: "/orders",
         icon: Users,
       });
-      items.push({
-        name: "Create Order",
-        href: "/orders/new",
-        icon: Plus,
-      });
+      if (canCreateOrder) {
+        items.push({
+          name: "Create Order",
+          href: "/orders/new",
+          icon: Plus,
+        });
+      }
     } else if (!isLoading && isResellerDefaultMember) {
  
       items.push({
@@ -108,11 +114,13 @@ export function Sidebar({ className }: SidebarProps) {
         href: "/orders",
         icon: Users,
       });
-      items.push({
-        name: "Create Order",
-        href: "/orders/new",
-        icon: Plus,
-      });
+      if (canCreateOrder) {
+        items.push({
+          name: "Create Order",
+          href: "/orders/new",
+          icon: Plus,
+        });
+      }
        items.push({
         name: "Promotion",
         href: "/promotion/request",

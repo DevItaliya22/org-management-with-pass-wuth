@@ -49,6 +49,7 @@ export default defineSchema({
     approvedByUserId: v.optional(v.id("users")), // Who approved this member (by which Owner)
     isActive: v.boolean(), // isActive => when user is active
     isBlocked: v.boolean(), // isBlocked => when user is blocked by owner
+    canCreateOrder: v.optional(v.boolean()), // permission: allow creating orders
     approvedAt: v.optional(v.number()),
     createdAt: v.number(),
     updatedAt: v.number(),

@@ -53,6 +53,11 @@ export const createOrder = mutation({
     if (membership.isBlocked) {
       throw new Error("Membership blocked");
     }
+    // Permission gate: require explicit canCreateOrder === true
+    const canCreate = membership.canCreateOrder === true;
+    if (!canCreate) {
+      throw new Error("You are not allowed to create orders for this team");
+    }
 
     const now = Date.now();
 

@@ -41,6 +41,7 @@ export const createResellerMember = internalMutation({
       status: "default_member",
       isActive: true,
       isBlocked: false,
+      canCreateOrder: true,
       createdAt: now,
       updatedAt: now,
     });
@@ -553,6 +554,7 @@ export const acceptInvitation = mutation({
         status: "team_joined",
         isActive: true,
         isBlocked: false,
+        canCreateOrder: true,
         createdAt: now,
         updatedAt: now,
       });
@@ -630,6 +632,7 @@ export const getTeamMembers = query({
       ),
       isActive: v.boolean(),
       isBlocked: v.boolean(),
+      canCreateOrder: v.optional(v.boolean()),
       approvedByUserId: v.optional(v.id("users")),
       approvedAt: v.optional(v.number()),
       createdAt: v.number(),
@@ -732,6 +735,45 @@ export const updateMemberStatus = mutation({
     const patch: any = { updatedAt: now };
     if (args.isActive !== undefined) patch.isActive = args.isActive;
     if (args.isBlocked !== undefined) patch.isBlocked = args.isBlocked;
+
+    await ctx.db.patch(args.memberId, patch);
+    return null;
+  },
+});
+
+// Update member permissions (admin only)
+export const updateMemberPermissions = mutation({
+  args: {
+    memberId: v.id("resellerMembers"),
+    canCreateOrder: v.optional(v.boolean()),
+    userId: v.id("users"),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const userId = args.userId;
+    if (!userId) throw new Error("Not authenticated");
+
+    const member = await ctx.db.get(args.memberId);
+    if (!member) throw new Error("Member not found");
+
+    const adminMembership = await ctx.db
+      .query("resellerMembers")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .filter((q) => q.eq(q.field("teamId"), member.teamId))
+      .first();
+    if (
+      !adminMembership ||
+      adminMembership.role !== "admin" ||
+      !adminMembership.isActive ||
+      adminMembership.isBlocked
+    ) {
+      throw new Error("Only team admins can update member permissions");
+    }
+
+    const now = Date.now();
+    const patch: any = { updatedAt: now };
+    if (args.canCreateOrder !== undefined)
+      patch.canCreateOrder = args.canCreateOrder;
 
     await ctx.db.patch(args.memberId, patch);
     return null;

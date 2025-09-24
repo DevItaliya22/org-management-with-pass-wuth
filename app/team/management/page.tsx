@@ -44,6 +44,7 @@ export default function TeamManagementPage() {
 
   const updateTeam = useMutation(api.teams.updateTeam);
   const updateMemberStatus = useMutation(api.teams.updateMemberStatus);
+  const updateMemberPermissions = useMutation(api.teams.updateMemberPermissions);
   const teamMembers = useQuery(
     api.teams.getTeamMembers,
     team?._id ? { teamId: team._id, userId: authSession?.user?.id as any } : "skip",
@@ -82,6 +83,24 @@ export default function TeamManagementPage() {
     } catch (err: any) {
       console.error("Failed to update member status:", err);
       toast.error(err?.message ?? "Failed to update member status");
+    }
+  };
+
+  const handleMemberPermissionChange = async (
+    memberId: Id<"resellerMembers">,
+    field: "canCreateOrder",
+    value: boolean,
+  ) => {
+    try {
+      await updateMemberPermissions({
+        memberId,
+        [field]: value,
+        userId: authSession?.user?.id as any,
+      } as any);
+      toast.success("Member permissions updated");
+    } catch (err: any) {
+      console.error("Failed to update member permissions:", err);
+      toast.error(err?.message ?? "Failed to update member permissions");
     }
   };
 
@@ -173,7 +192,8 @@ export default function TeamManagementPage() {
                     <TableHead>Status</TableHead>
                     <TableHead>Active</TableHead>
                     <TableHead>Blocked</TableHead>
-                    <TableHead>Actions</TableHead>
+                  <TableHead>Can Create Order</TableHead>
+                  <TableHead>Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -241,6 +261,19 @@ export default function TeamManagementPage() {
                             handleMemberStatusChange(
                               member._id,
                               "isBlocked",
+                              checked,
+                            )
+                          }
+                          disabled={member.role === "admin"}
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Switch
+                          checked={!!member.canCreateOrder}
+                          onCheckedChange={(checked) =>
+                            handleMemberPermissionChange(
+                              member._id,
+                              "canCreateOrder",
                               checked,
                             )
                           }

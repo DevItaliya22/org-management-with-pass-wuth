@@ -6,6 +6,7 @@ import DashboardLayout from "@/components/Dashboard/DashboardLayout";
 import { useRole } from "@/hooks/use-role";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { notFound } from "next/navigation";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -111,6 +112,8 @@ export default function NewOrderPage() {
 
   if (isLoading) return <div className="p-4">Loading…</div>;
   if (isStaff || isOwner) return <div className="p-4">Not authorized</div>;
+  const canCreateOrder = (session?.resellerMember as any)?.canCreateOrder === true;
+  if (!canCreateOrder) return notFound();
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
