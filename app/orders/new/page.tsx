@@ -181,10 +181,10 @@ export default function NewOrderPage() {
     <DashboardLayout>
       <div className="p-6 max-w-6xl mx-auto">
         {(submitting || uploading || redirecting) && (
-          <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/10">
-            <div className="rounded-md bg-white shadow px-4 py-3 text-sm flex items-center gap-2 border">
+          <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/10 dark:bg-black/60 backdrop-blur-sm">
+            <div className="rounded-md bg-white dark:bg-neutral-900 shadow px-4 py-3 text-sm flex items-center gap-2 border border-border">
               <svg
-                className="animate-spin h-4 w-4 text-gray-600"
+                className="animate-spin h-4 w-4 text-gray-600 dark:text-gray-300"
                 xmlns="http://www.w3.org/2000/svg"
                 fill="none"
                 viewBox="0 0 24 24"
@@ -203,7 +203,7 @@ export default function NewOrderPage() {
                   d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
                 ></path>
               </svg>
-              <span>
+              <span className="text-gray-700 dark:text-gray-200">
                 {redirecting
                   ? "Redirecting to order…"
                   : uploading

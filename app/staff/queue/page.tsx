@@ -42,10 +42,12 @@ import {
 import Link from "next/link";
 import { Eye } from "lucide-react";
 import { toast } from "@/components/ui/sonner";
+import { useRouter } from "next/navigation";
 
 export default function StaffQueuePage() {
   const { isLoading, isStaff, authSession } = useRole();
   const isMobile = useIsMobile();
+  const router = useRouter();
   const [view, setView] = useState<"kanban" | "list">("kanban");
   const [lane, setLane] = useState<
     "queue" | "in_progress" | "on_hold" | "fulfil_submitted"
@@ -141,6 +143,7 @@ export default function StaffQueuePage() {
         await pick({ orderId, userId: authSession?.user?.id as any });
         await start({ orderId, userId: authSession?.user?.id as any });
         toast.success("Order started");
+        router.push(`/orders/${orderId}`);
         return;
       }
       // Prevent direct move from queue -> on_hold. Must go to in_progress first.
@@ -603,6 +606,7 @@ export default function StaffQueuePage() {
                       await pick({ orderId: id as any, userId: authSession?.user?.id as any });
                       await start({ orderId: id as any, userId: authSession?.user?.id as any });
                       toast.success("Order started");
+                  router.push(`/orders/${id}`);
                     } else if (from === "queue" && (to === "on_hold" || to === "fulfil_submitted")) {
                       // Disallow direct moves from queue to on_hold or fulfil_submitted
                       toast.error("Move to In Progress first");

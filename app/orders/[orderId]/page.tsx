@@ -34,6 +34,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import RaiseDisputeDialog from "./RaiseDisputeDialog";
+import FulfilmentSubmitDialog from "@/app/staff/queue/FulfilmentSubmitDialog";
+import { toast } from "@/components/ui/sonner";
 
 export default function OrderDetailsPage() {
   const {
@@ -111,6 +113,8 @@ export default function OrderDetailsPage() {
   const partialRefundAndCompleteDispute = useMutation(
     api.orders.partialRefundAndCompleteDispute,
   );
+  const holdOrder = useMutation(api.orders.holdOrder);
+  const resumeOrder = useMutation(api.orders.resumeOrder);
 
   const [completing, setCompleting] = useState(false);
   // Dispute raise state moved into RaiseDisputeButton to avoid extra rerenders
@@ -122,6 +126,16 @@ export default function OrderDetailsPage() {
   const [resolutionNotes, setResolutionNotes] = useState("");
   const [adjustmentAmount, setAdjustmentAmount] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [holdOpen, setHoldOpen] = useState(false);
+  const [holdReason, setHoldReason] = useState("");
+  const [fulfilDialogOpen, setFulfilDialogOpen] = useState(false);
+
+  // Staff online status
+  const myStaff = useQuery(
+    api.staff.getMyStaff,
+    authSession?.user?.id ? ({ userId: authSession.user.id as any } as any) : ("skip" as any),
+  );
+  const canAct = myStaff?.status === "online";
 
   // Removed dispute file helpers; handled in RaiseDisputeButton
 
@@ -282,8 +296,80 @@ export default function OrderDetailsPage() {
   );
 
   return (
+    <>
     <DashboardLayout>
       <div className="space-y-4">
+        {/* Staff actions */}
+        {isStaff && order && (
+          <div className="flex items-center gap-2">
+            {order.status === "in_progress" && (
+              <>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  disabled={!canAct}
+                  onClick={() => {
+                    if (!canAct) {
+                      toast.error("You are not online.");
+                      return;
+                    }
+                    setHoldOpen(true);
+                  }}
+                >
+                  Hold
+                </Button>
+                <Button
+                  size="sm"
+                  disabled={!canAct}
+                  onClick={() => {
+                    if (!canAct) {
+                      toast.error("You are not online.");
+                      return;
+                    }
+                    setFulfilDialogOpen(true);
+                  }}
+                >
+                  Submit Fulfilment
+                </Button>
+              </>
+            )}
+            {order.status === "on_hold" && (
+              <>
+                <Button
+                  size="sm"
+                  disabled={!canAct}
+                  onClick={async () => {
+                    try {
+                      if (!canAct) {
+                        toast.error("You are not online.");
+                        return;
+                      }
+                      await resumeOrder({ orderId: order._id, userId: authSession?.user?.id as any });
+                      toast.success("Order resumed");
+                    } catch (e: any) {
+                      toast.error(e?.message || "Failed to resume order");
+                    }
+                  }}
+                >
+                  Resume
+                </Button>
+                <Button
+                  size="sm"
+                  disabled={!canAct}
+                  onClick={() => {
+                    if (!canAct) {
+                      toast.error("You are not online.");
+                      return;
+                    }
+                    setFulfilDialogOpen(true);
+                  }}
+                >
+                  Submit Fulfilment
+                </Button>
+              </>
+            )}
+          </div>
+        )}
         {isReseller && order.status === "fulfil_submitted" && (
           <div className="flex items-center gap-2">
             <Button
@@ -791,6 +877,65 @@ export default function OrderDetailsPage() {
         </div>
       </div>
     </DashboardLayout>
+    
+      {/* Hold dialog */}
+      <Dialog open={holdOpen} onOpenChange={(o) => {
+        setHoldOpen(o);
+        if (!o) setHoldReason("");
+      }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Put order on hold</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label htmlFor="hold-reason" className="text-sm font-medium">Reason</Label>
+            <Input
+              id="hold-reason"
+              value={holdReason}
+              onChange={(e) => setHoldReason(e.target.value)}
+              placeholder="Enter reason"
+            />
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setHoldOpen(false);
+                setHoldReason("");
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              disabled={!holdReason.trim() || !order || !canAct}
+              onClick={async () => {
+                if (!order) return;
+                try {
+                  if (!canAct) { toast.error("You are not online."); return; }
+                  await holdOrder({ orderId: order._id, reason: holdReason.trim(), userId: authSession?.user?.id as any });
+                  toast.success("Order put on hold");
+                  setHoldOpen(false);
+                  setHoldReason("");
+                } catch (e: any) {
+                  toast.error(e?.message || "Failed to put order on hold");
+                }
+              }}
+            >
+              Confirm
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Fulfilment dialog */}
+      {order && (
+        <FulfilmentSubmitDialog
+          orderId={order._id}
+          open={fulfilDialogOpen}
+          onOpenChange={setFulfilDialogOpen}
+        />
+      )}
+    </>
   );
 }
 
