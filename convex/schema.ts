@@ -288,18 +288,57 @@ export default defineSchema({
     .index("by_dateEpoch", ["dateEpoch"]),
 
   auditLogs: defineTable({
+    // Core identification
     actorUserId: v.id("users"),
-    entity: v.string(),
-    entityId: v.string(),
-    action: v.string(),
-    metadata: v.optional(v.any()),
     orderId: v.optional(v.id("orders")),
+    teamId: v.optional(v.id("teams")),
+    
+    // Action categorization for reporting
+    actionType: v.union(
+      // Staff actions (workflow steps)
+      v.literal("order_picked"),
+      v.literal("order_resumed"), // When order is resumed from hold
+      v.literal("order_passed"), 
+      v.literal("order_hold"),
+      v.literal("fulfil_submitted"), // Key staff completion metric
+      
+      // Reseller actions (satisfaction decisions)
+      v.literal("order_created"),
+      v.literal("order_completed"), // Reseller satisfaction
+      v.literal("order_disputed"), // Reseller dissatisfaction
+      
+      // System actions
+      v.literal("order_auto_cancelled"),
+      v.literal("dispute_resolved"),
+      v.literal("staff_status_change")
+    ),
+    
+    // Performance metrics data
+    metrics: v.optional(v.object({
+      // For AHT calculation (staff pickup → fulfillment)
+      staffStartTime: v.optional(v.number()),
+      staffEndTime: v.optional(v.number()),
+      
+      // For value tracking
+      orderValue: v.optional(v.number()),
+      
+      // For dispute tracking
+      disputeReason: v.optional(v.string()),
+      
+      // For pass/hold tracking
+      decisionReason: v.optional(v.string()),
+    })),
+    
+    // Timestamps
     createdAt: v.number(),
   })
     .index("by_actor", ["actorUserId"])
-    .index("by_entity", ["entity", "entityId"])
+    .index("by_order", ["orderId"])
+    .index("by_team", ["teamId"])
+    .index("by_action", ["actionType"])
     .index("by_createdAt", ["createdAt"])
-    .index("by_orderId", ["orderId"]),
+    .index("by_actor_and_action", ["actorUserId", "actionType"])
+    .index("by_team_and_action", ["teamId", "actionType"]),
 
   costs: defineTable({
     type: v.union(

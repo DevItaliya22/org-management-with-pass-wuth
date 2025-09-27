@@ -21,6 +21,7 @@ import type * as http from "../http.js";
 import type * as lib_teamNames from "../lib/teamNames.js";
 import type * as orders from "../orders.js";
 import type * as otp_sendEmailAction from "../otp/sendEmailAction.js";
+import type * as reportingAudits from "../reportingAudits.js";
 import type * as session from "../session.js";
 import type * as staff from "../staff.js";
 import type * as teams from "../teams.js";
@@ -44,6 +45,7 @@ declare const fullApi: ApiFromModules<{
   "lib/teamNames": typeof lib_teamNames;
   orders: typeof orders;
   "otp/sendEmailAction": typeof otp_sendEmailAction;
+  reportingAudits: typeof reportingAudits;
   session: typeof session;
   staff: typeof staff;
   teams: typeof teams;

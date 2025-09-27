@@ -121,18 +121,15 @@ export const createOrder = mutation({
       writeAccessUserIds: defaultAccessIds as any,
     });
 
-    // Minimal audit log
+    // Audit log for order creation
     await ctx.db.insert("auditLogs", {
       actorUserId: userId,
-      entity: "order",
-      entityId: String(orderId),
-      action: "order_created",
-      metadata: {
-        teamId: args.teamId,
-        categoryId: args.categoryId,
-        cartValueUsd: args.cartValueUsd,
-      },
       orderId: orderId,
+      teamId: args.teamId,
+      actionType: "order_created",
+      metrics: {
+        orderValue: args.cartValueUsd,
+      },
       createdAt: now,
     });
 
@@ -587,12 +584,18 @@ export const pickOrder = mutation({
       writeAccessUserIds: Array.from(existingWrite) as any,
     });
 
+    // Get order details for audit metrics
+    const orderForAudit = await ctx.db.get(args.orderId);
+    
     await ctx.db.insert("auditLogs", {
       actorUserId: userId,
-      entity: "order",
-      entityId: String(args.orderId),
-      action: "order_picked",
       orderId: args.orderId,
+      teamId: orderForAudit?.teamId,
+      actionType: "order_picked",
+      metrics: {
+        staffStartTime: now,
+        orderValue: orderForAudit?.cartValueUsd,
+      },
       createdAt: now,
     });
     return null;
@@ -620,13 +623,18 @@ export const passOrder = mutation({
       });
     }
 
+    // Get order details for audit metrics
+    const orderForAudit = await ctx.db.get(args.orderId);
+    
     await ctx.db.insert("auditLogs", {
       actorUserId: userId,
-      entity: "order",
-      entityId: String(args.orderId),
-      action: "order_passed",
-      metadata: { reason: args.reason },
       orderId: args.orderId,
+      teamId: orderForAudit?.teamId,
+      actionType: "order_passed",
+      metrics: {
+        decisionReason: args.reason,
+        orderValue: orderForAudit?.cartValueUsd,
+      },
       createdAt: now,
     });
 
@@ -653,11 +661,12 @@ export const passOrder = mutation({
         });
         await ctx.db.insert("auditLogs", {
           actorUserId: userId,
-          entity: "order",
-          entityId: String(args.orderId),
-          action: "order_cancelled_auto_all_passed",
-          metadata: { totalActiveStaff: activeStaffUserIds.length },
           orderId: args.orderId,
+          teamId: order.teamId,
+          actionType: "order_auto_cancelled",
+          metrics: {
+            orderValue: order.cartValueUsd,
+          },
           createdAt: cancelAt,
         });
       }
@@ -682,12 +691,17 @@ export const moveToInProgress = mutation({
 
     const now = Date.now();
     await ctx.db.patch(args.orderId, { status: "in_progress", updatedAt: now });
+    // Get order details for audit metrics
+    const orderForAudit = await ctx.db.get(args.orderId);
+    
     await ctx.db.insert("auditLogs", {
       actorUserId: userId,
-      entity: "order",
-      entityId: String(args.orderId),
-      action: "order_in_progress",
       orderId: args.orderId,
+      teamId: orderForAudit?.teamId,
+      actionType: "order_picked", // This is when order moves to in_progress
+      metrics: {
+        orderValue: orderForAudit?.cartValueUsd,
+      },
       createdAt: now,
     });
     return null;
@@ -713,13 +727,18 @@ export const holdOrder = mutation({
       holdReason: args.reason,
       updatedAt: now,
     });
+    // Get order details for audit metrics
+    const orderForAudit = await ctx.db.get(args.orderId);
+    
     await ctx.db.insert("auditLogs", {
       actorUserId: userId,
-      entity: "order",
-      entityId: String(args.orderId),
-      action: "order_hold",
-      metadata: { reason: args.reason },
       orderId: args.orderId,
+      teamId: orderForAudit?.teamId,
+      actionType: "order_hold",
+      metrics: {
+        decisionReason: args.reason,
+        orderValue: orderForAudit?.cartValueUsd,
+      },
       createdAt: now,
     });
     return null;
@@ -744,12 +763,17 @@ export const resumeOrder = mutation({
       holdReason: undefined,
       updatedAt: now,
     });
+    // Get order details for audit metrics
+    const orderForAudit = await ctx.db.get(args.orderId);
+    
     await ctx.db.insert("auditLogs", {
       actorUserId: userId,
-      entity: "order",
-      entityId: String(args.orderId),
-      action: "order_resume",
       orderId: args.orderId,
+      teamId: orderForAudit?.teamId,
+      actionType: "order_resumed", // When order is resumed from hold
+      metrics: {
+        orderValue: orderForAudit?.cartValueUsd,
+      },
       createdAt: now,
     });
     return null;
@@ -787,12 +811,18 @@ export const submitFulfilment = mutation({
       },
       updatedAt: now,
     });
+    // Get order details for audit metrics
+    const orderForAudit = await ctx.db.get(args.orderId);
+    
     await ctx.db.insert("auditLogs", {
       actorUserId: userId,
-      entity: "order",
-      entityId: String(args.orderId),
-      action: "order_fulfil_submitted",
       orderId: args.orderId,
+      teamId: orderForAudit?.teamId,
+      actionType: "fulfil_submitted",
+      metrics: {
+        staffEndTime: now,
+        orderValue: args.finalValueUsd,
+      },
       createdAt: now,
     });
     return null;
@@ -833,12 +863,17 @@ export const completeOrder = mutation({
 
     const now = Date.now();
     await ctx.db.patch(args.orderId, { status: "completed", updatedAt: now });
+    // Get order details for audit metrics
+    const orderForAudit = await ctx.db.get(args.orderId);
+    
     await ctx.db.insert("auditLogs", {
       actorUserId: userId,
-      entity: "order",
-      entityId: String(args.orderId),
-      action: "order_completed",
       orderId: args.orderId,
+      teamId: orderForAudit?.teamId,
+      actionType: "order_completed",
+      metrics: {
+        orderValue: orderForAudit?.cartValueUsd,
+      },
       createdAt: now,
     });
     return null;
@@ -889,11 +924,13 @@ export const raiseDispute = mutation({
     await ctx.db.patch(args.orderId, { status: "disputed", updatedAt: now });
     await ctx.db.insert("auditLogs", {
       actorUserId: userId,
-      entity: "order",
-      entityId: String(args.orderId),
-      action: "order_disputed",
-      metadata: { reason: args.reason },
       orderId: args.orderId,
+      teamId: order.teamId,
+      actionType: "order_disputed",
+      metrics: {
+        disputeReason: args.reason,
+        orderValue: order.cartValueUsd,
+      },
       createdAt: now,
     });
     return null;
@@ -1160,16 +1197,7 @@ export const updateOrderReadAccess = mutation({
       updatedAt: now,
     });
 
-    await ctx.db.insert("auditLogs", {
-      actorUserId: userId,
-      entity: "order",
-      entityId: String(args.orderId),
-      action: "order_read_access_updated",
-      metadata: { userIds: args.userIds },
-      orderId: args.orderId,
-      createdAt: now,
-    });
-
+  
     return null;
   },
 });
@@ -1240,16 +1268,7 @@ export const updateOrderWriteAccess = mutation({
       updatedAt: now,
     });
 
-    await ctx.db.insert("auditLogs", {
-      actorUserId: userId,
-      entity: "order",
-      entityId: String(args.orderId),
-      action: "order_write_access_updated",
-      metadata: { userIds: args.userIds },
-      orderId: args.orderId,
-      createdAt: now,
-    });
-
+  
     return null;
   },
 });
@@ -1374,17 +1393,19 @@ export const fixAndCompleteDispute = mutation({
       });
     }
 
+    // Get order details for audit metrics
+    const orderForAudit = await ctx.db.get(dispute.orderId);
+    
     // Log the action
     await ctx.db.insert("auditLogs", {
       actorUserId: userId,
-      entity: "dispute",
-      entityId: String(args.disputeId),
-      action: "dispute_fixed_and_completed",
-      metadata: {
-        orderId: dispute.orderId,
-        resolutionNotes: args.resolutionNotes,
-      },
       orderId: dispute.orderId,
+      teamId: orderForAudit?.teamId,
+      actionType: "dispute_resolved",
+      metrics: {
+        disputeReason: dispute.reason,
+        orderValue: orderForAudit?.cartValueUsd,
+      },
       createdAt: now,
     });
 
@@ -1432,17 +1453,19 @@ export const declineAndCompleteDispute = mutation({
       });
     }
 
+    // Get order details for audit metrics
+    const orderForAudit = await ctx.db.get(dispute.orderId);
+    
     // Log the action
     await ctx.db.insert("auditLogs", {
       actorUserId: userId,
-      entity: "dispute",
-      entityId: String(args.disputeId),
-      action: "dispute_declined_and_completed",
-      metadata: {
-        orderId: dispute.orderId,
-        resolutionNotes: args.resolutionNotes,
-      },
       orderId: dispute.orderId,
+      teamId: orderForAudit?.teamId,
+      actionType: "dispute_resolved",
+      metrics: {
+        disputeReason: dispute.reason,
+        orderValue: orderForAudit?.cartValueUsd,
+      },
       createdAt: now,
     });
 
@@ -1480,14 +1503,14 @@ export const partialRefundAndCompleteDispute = mutation({
     });
 
     // Get the order to access team information
-    const order = await ctx.db.get(dispute.orderId);
-    if (!order) throw new Error("Order not found");
+    const orderForTeamInfo = await ctx.db.get(dispute.orderId);
+    if (!orderForTeamInfo) throw new Error("Order not found");
 
     // TODO: Implement balance adjustment when balance system is added
     // Adjust reseller balance (negative adjustment = credit to reseller)
-    // const team = await ctx.db.get(order.teamId);
+    // const team = await ctx.db.get(orderForTeamInfo.teamId);
     // if (team) {
-    //   await ctx.db.patch(order.teamId, {
+    //   await ctx.db.patch(orderForTeamInfo.teamId, {
     //     balanceUsd: (team.balanceUsd || 0) - args.adjustmentAmountUsd,
     //     updatedAt: now,
     //   });
@@ -1508,18 +1531,19 @@ export const partialRefundAndCompleteDispute = mutation({
       });
     }
 
+    // Get order details for audit metrics
+    const orderForAudit = await ctx.db.get(dispute.orderId);
+    
     // Log the action
     await ctx.db.insert("auditLogs", {
       actorUserId: userId,
-      entity: "dispute",
-      entityId: String(args.disputeId),
-      action: "dispute_partial_refund_and_completed",
-      metadata: {
-        orderId: dispute.orderId,
-        adjustmentAmountUsd: args.adjustmentAmountUsd,
-        resolutionNotes: args.resolutionNotes,
-      },
       orderId: dispute.orderId,
+      teamId: orderForAudit?.teamId,
+      actionType: "dispute_resolved",
+      metrics: {
+        disputeReason: dispute.reason,
+        orderValue: orderForAudit?.cartValueUsd,
+      },
       createdAt: now,
     });
 

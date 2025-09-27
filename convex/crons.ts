@@ -23,10 +23,12 @@ export const autoCancelStaleOrders = internalMutation({
         });
         await ctx.db.insert("auditLogs", {
           actorUserId: o.createdByUserId,
-          entity: "order",
-          entityId: String(o._id),
-          action: "order_auto_cancelled",
           orderId: o._id,
+          teamId: o.teamId,
+          actionType: "order_auto_cancelled",
+          metrics: {
+            orderValue: o.cartValueUsd,
+          },
           createdAt: now,
         });
       }

@@ -129,6 +129,7 @@ export default function OrderDetailsPage() {
   const [holdOpen, setHoldOpen] = useState(false);
   const [holdReason, setHoldReason] = useState("");
   const [fulfilDialogOpen, setFulfilDialogOpen] = useState(false);
+  const [completeConfirmOpen, setCompleteConfirmOpen] = useState(false);
 
   // Staff online status
   const myStaff = useQuery(
@@ -375,15 +376,7 @@ export default function OrderDetailsPage() {
             <Button
               size="sm"
               disabled={completing}
-              onClick={async () => {
-                try {
-                  setCompleting(true);
-                  await completeOrder({ orderId: order._id, userId: authSession?.user?.id as any });
-                  router.refresh();
-                } finally {
-                  setCompleting(false);
-                }
-              }}
+              onClick={() => setCompleteConfirmOpen(true)}
             >
               {completing ? "Completing…" : "Mark Complete"}
             </Button>
@@ -935,6 +928,60 @@ export default function OrderDetailsPage() {
           onOpenChange={setFulfilDialogOpen}
         />
       )}
+
+      {/* Complete Order Confirmation Dialog */}
+      <Dialog open={completeConfirmOpen} onOpenChange={setCompleteConfirmOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Confirm Order Completion</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="h-5 w-5 text-amber-500 mt-0.5 flex-shrink-0" />
+              <div className="space-y-2">
+                <p className="text-sm text-muted-foreground">
+                  Are you sure you want to mark this order as complete? This action will:
+                </p>
+                <ul className="text-sm text-muted-foreground space-y-1 ml-4">
+                  <li>• Finalize the order and close it</li>
+                  <li>• Mark the staff fulfillment as successful</li>
+                  <li>• Complete the transaction</li>
+                </ul>
+                <p className="text-sm font-medium text-amber-700">
+                  This action cannot be undone.
+                </p>
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setCompleteConfirmOpen(false)}
+              disabled={completing}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={async () => {
+                try {
+                  setCompleting(true);
+                  await completeOrder({ orderId: order._id, userId: authSession?.user?.id as any });
+                  setCompleteConfirmOpen(false);
+                  router.refresh();
+                } catch (e: any) {
+                  toast.error(e?.message || "Failed to complete order");
+                } finally {
+                  setCompleting(false);
+                }
+              }}
+              disabled={completing}
+              className="bg-green-600 hover:bg-green-700"
+            >
+              {completing ? "Completing..." : "Yes, Mark Complete"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

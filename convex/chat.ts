@@ -287,21 +287,7 @@ export const saveUploadedFile = mutation({
       updatedAt: now,
     });
 
-    // Log the file upload
-    await ctx.db.insert("auditLogs", {
-      actorUserId: userId,
-      entity: "file",
-      entityId: fileId,
-      action: "file_uploaded",
-      metadata: {
-        fileName: args.uiName,
-        fileSize: args.sizeBytes,
-        entityType: args.entityType,
-        entityId: args.entityId,
-      },
-      createdAt: now,
-    });
-
+    
     return fileId;
   },
 });
