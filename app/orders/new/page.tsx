@@ -23,7 +23,7 @@ import { Upload, File, X } from "lucide-react";
 import { toast } from "@/components/ui/sonner";
 
 export default function NewOrderPage() {
-  const { session, isLoading, isStaff, isOwner, authSession } = useRole();
+  const { session, isLoading, isStaff, isOwner, authSession, isResellerDefaultMember } = useRole();
   const router = useRouter();
   const categories = useQuery(api.orders.listActiveCategories, {});
   const createOrder = useMutation(api.orders.createOrder);
@@ -112,7 +112,9 @@ export default function NewOrderPage() {
 
   if (isLoading) return <div className="p-4">Loading…</div>;
   if (isStaff || isOwner) return <div className="p-4">Not authorized</div>;
-  const canCreateOrder = (session?.resellerMember as any)?.canCreateOrder === true;
+  const canCreateOrder =
+    ((session as any)?.resellerMember?.canCreateOrder === true) ||
+    (!isLoading && isResellerDefaultMember === true);
   if (!canCreateOrder) return notFound();
 
   const onSubmit = async (e: React.FormEvent) => {

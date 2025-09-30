@@ -17,12 +17,17 @@ export function useRole() {
 
   // Avoid defaulting while loading to prevent incorrect redirects/404s on hard reload
   const role = isLoading || convexLoading ? undefined : (authSession?.user as any)?.role || convexSession?.user?.role;
-  const memberStatus = convexSession?.resellerMember?.status;
+  // If the user is a reseller but has no team membership yet, treat as "default_member"
+  const memberStatus = (isLoading || convexLoading)
+    ? undefined
+    : (convexSession?.resellerMember?.status ?? (role === "reseller" ? "default_member" : undefined));
   const memberRole = convexSession?.resellerMember?.role;
 
   const isOwner = role === "owner";
   const isStaff = role === "staff";
-  const isResellerDefaultMember = memberStatus === "default_member";
+  const isResellerDefaultMember = (isLoading || convexLoading)
+    ? undefined
+    : memberStatus === "default_member";
 
   // Only one of these should be true for reseller-side:
   const isResellerAdmin = memberStatus === "team_joined" && memberRole === "admin";

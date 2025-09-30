@@ -280,6 +280,12 @@ export const createUserWithPassword = action({
       },
     );
 
+    const teamId = await ctx.runMutation(internal.teams.createTeam, { userId });
+    await ctx.runMutation(internal.teams.createResellerMember, {
+      teamId,
+      userId,
+    });
+
     return userId;
   },
 });

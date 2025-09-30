@@ -12,10 +12,19 @@ interface SidebarProps {
 
 export function Sidebar({ className }: SidebarProps) {
   const pathname = usePathname();
-  const { isLoading, isOwner, isStaff, isResellerAdmin, isResellerMember ,isResellerDefaultMember, session } =
-    useRole();
-
-  const canCreateOrder = (session?.resellerMember as any)?.canCreateOrder === true;
+  const {
+    isLoading,
+    isOwner,
+    isStaff,
+    isResellerAdmin,
+    isResellerMember,
+    isResellerDefaultMember,
+    session,
+  } = useRole();
+  const canCreateOrder =
+    ((session as any)?.resellerMember?.canCreateOrder === true) ||
+    (!isLoading && isResellerDefaultMember === true);
+  console.log(canCreateOrder);
 
   const items: Array<{ name: string; href: string; icon: any }> = [
     {
@@ -70,7 +79,11 @@ export function Sidebar({ className }: SidebarProps) {
     });
   } else {
     if (!isLoading && isResellerAdmin) {
-      items.push({ name: "Team Management", href: "/team/management", icon: Users });
+      items.push({
+        name: "Team Management",
+        href: "/team/management",
+        icon: Users,
+      });
       items.push({
         name: "Team Invitations",
         href: "/team/invitations",
@@ -108,7 +121,6 @@ export function Sidebar({ className }: SidebarProps) {
         });
       }
     } else if (!isLoading && isResellerDefaultMember) {
- 
       items.push({
         name: "Team Requests",
         href: "/team/requests",
@@ -126,7 +138,7 @@ export function Sidebar({ className }: SidebarProps) {
           icon: Plus,
         });
       }
-       items.push({
+      items.push({
         name: "Promotion",
         href: "/promotion/request",
         icon: ShieldCheck,
