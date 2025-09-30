@@ -1,1 +1,0 @@
-make a checkpermission funtion if needed => pass ctx , userId , role for which this should work => now chekc if given role and user role is matching then its god to go 
