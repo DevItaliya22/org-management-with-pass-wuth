@@ -3,14 +3,11 @@
 import { useMemo, useState } from "react";
 import DashboardLayout from "@/components/Dashboard/DashboardLayout";
 import { MetricCard } from "@/components/Dashboard/MetricCard";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Calendar } from "@/components/ui/calendar";
-import { DateRange } from "react-day-picker";
+ 
 import { Download, RefreshCw } from "lucide-react";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
@@ -18,11 +15,17 @@ import { StaffKPIsTable } from "@/components/ReportingAudits/StaffKPIsTable";
 import { ResellerKPIsTable } from "@/components/ReportingAudits/ResellerKPIsTable";
 import { ActivityLogs } from "@/components/ReportingAudits/ActivityLogs";
 import { ReportingOverview } from "@/components/ReportingAudits/ReportingOverview";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 const ReportingAudits = () => {
   const [activeTab, setActiveTab] = useState("overview");
   const [rangePreset, setRangePreset] = useState<"today" | "7d" | "30d" | "custom">("today");
-  const [customRange, setCustomRange] = useState<DateRange | undefined>(undefined);
+  
 
   const dateRange = useMemo(() => {
     const now = new Date();
@@ -38,21 +41,17 @@ const ReportingAudits = () => {
     if (rangePreset === "30d") {
       return { start: nowMs - 30 * 24 * 60 * 60 * 1000, end: nowMs };
     }
-    // custom
-    const from = customRange?.from;
-    const to = customRange?.to;
-    if (from && to) {
-      const start = new Date(from);
+    // custom (no calendar for now) -> treat as today
+    if (rangePreset === "custom") {
+      const start = new Date();
       start.setHours(0, 0, 0, 0);
-      const end = new Date(to);
-      end.setHours(23, 59, 59, 999);
-      return { start: start.getTime(), end: end.getTime() };
+      return { start: start.getTime(), end: nowMs };
     }
     // fallback: today
     const start = new Date();
     start.setHours(0, 0, 0, 0);
     return { start: start.getTime(), end: nowMs };
-  }, [rangePreset, customRange]);
+  }, [rangePreset]);
 
   // Fetch reporting data (all scoped by selected dateRange)
   const overview = useQuery(api.reportingAudits.getDashboardOverview, { dateRange });
@@ -71,6 +70,160 @@ const ReportingAudits = () => {
   const handleExport = (type: string) => {
     // TODO: Implement CSV/PDF export functionality
     console.log(`Exporting ${type}...`);
+  };
+
+  const exportStaffAsCSV = () => {
+    if (!staffKPIs || staffKPIs.length === 0) return;
+    const headers = [
+      "Staff Name",
+      "AHT (mins)",
+      "Success Rate (%)",
+      "Pass/Hold Ratio",
+      "Orders Today",
+      "Total Orders",
+      "Status",
+    ];
+    const rows = staffKPIs.map((s) => [
+      s.staffName,
+      String(s.aht),
+      String(s.successRate),
+      String(s.passHoldRatio),
+      String(s.ordersToday),
+      String(s.totalOrders),
+      s.status,
+    ]);
+    const csv = [headers, ...rows]
+      .map((r) => r.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(","))
+      .join("\n");
+    const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `staff-kpis-${new Date().toISOString().slice(0,10)}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  const exportStaffAsPDF = () => {
+    if (!staffKPIs || staffKPIs.length === 0) return;
+    const win = window.open("", "_blank");
+    if (!win) return;
+    const style = `
+      <style>
+        body { font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial; padding: 24px; }
+        h1 { font-size: 18px; margin: 0 0 12px; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { border: 1px solid #ddd; padding: 8px; font-size: 12px; }
+        th { background: #f5f5f5; text-align: left; }
+      </style>
+    `;
+    const header = `<h1>Staff KPIs Report (${new Date().toLocaleString()})</h1>`;
+    const tableHead = `
+      <tr>
+        <th>Staff Name</th>
+        <th>AHT (mins)</th>
+        <th>Success Rate (%)</th>
+        <th>Pass/Hold Ratio</th>
+        <th>Orders Today</th>
+        <th>Total Orders</th>
+        <th>Status</th>
+      </tr>
+    `;
+    const tableRows = staffKPIs
+      .map((s) => `
+        <tr>
+          <td>${s.staffName}</td>
+          <td>${s.aht}</td>
+          <td>${s.successRate}</td>
+          <td>${s.passHoldRatio}</td>
+          <td>${s.ordersToday}</td>
+          <td>${s.totalOrders}</td>
+          <td>${s.status}</td>
+        </tr>
+      `)
+      .join("");
+    win.document.write(`<!doctype html><html><head><meta charset="utf-8"/>${style}</head><body>${header}<table><thead>${tableHead}</thead><tbody>${tableRows}</tbody></table></body></html>`);
+    win.document.close();
+    win.focus();
+    win.print();
+  };
+
+  const exportResellerAsCSV = () => {
+    if (!resellerKPIs || resellerKPIs.length === 0) return;
+    const headers = [
+      "Team Name",
+      "Orders Today",
+      "Total Orders",
+      "Dispute Rate (%)",
+      "Low-Value Orders",
+      "Auto-Cancel Rate (%)",
+      "Revenue ($)",
+    ];
+    const rows = resellerKPIs.map((r) => [
+      r.teamName,
+      String(r.ordersToday),
+      String(r.totalOrders),
+      String(r.disputeRate),
+      String(r.lowValueOrders),
+      String(r.autoCancelRate),
+      String(r.revenue),
+    ]);
+    const csv = [headers, ...rows]
+      .map((r) => r.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(","))
+      .join("\n");
+    const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `reseller-kpis-${new Date().toISOString().slice(0,10)}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  const exportResellerAsPDF = () => {
+    if (!resellerKPIs || resellerKPIs.length === 0) return;
+    const win = window.open("", "_blank");
+    if (!win) return;
+    const style = `
+      <style>
+        body { font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial; padding: 24px; }
+        h1 { font-size: 18px; margin: 0 0 12px; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { border: 1px solid #ddd; padding: 8px; font-size: 12px; }
+        th { background: #f5f5f5; text-align: left; }
+      </style>
+    `;
+    const header = `<h1>Reseller KPIs Report (${new Date().toLocaleString()})</h1>`;
+    const head = `
+      <tr>
+        <th>Team Name</th>
+        <th>Orders Today</th>
+        <th>Total Orders</th>
+        <th>Dispute Rate (%)</th>
+        <th>Low-Value Orders</th>
+        <th>Auto-Cancel Rate (%)</th>
+        <th>Revenue ($)</th>
+      </tr>
+    `;
+    const rows = resellerKPIs.map((r) => `
+      <tr>
+        <td>${r.teamName}</td>
+        <td>${r.ordersToday}</td>
+        <td>${r.totalOrders}</td>
+        <td>${r.disputeRate}</td>
+        <td>${r.lowValueOrders}</td>
+        <td>${r.autoCancelRate}</td>
+        <td>${r.revenue}</td>
+      </tr>
+    `).join("");
+    win.document.write(`<!doctype html><html><head><meta charset="utf-8"/>${style}</head><body>${header}<table><thead>${head}</thead><tbody>${rows}</tbody></table></body></html>`);
+    win.document.close();
+    win.focus();
+    win.print();
   };
 
   const handleRefresh = () => {
@@ -99,34 +252,10 @@ const ReportingAudits = () => {
                 <SelectItem value="custom">Date range</SelectItem>
               </SelectContent>
             </Select>
-            {rangePreset === "custom" && (
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button variant="outline" size="sm">
-                    {customRange?.from && customRange?.to
-                      ? `${customRange.from.toLocaleDateString()} - ${customRange.to.toLocaleDateString()}`
-                      : "Select dates"}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar
-                    mode="range"
-                    selected={customRange}
-                    onSelect={(range: DateRange | undefined) =>
-                      setCustomRange(range)
-                    }
-                    numberOfMonths={2}
-                  />
-                </PopoverContent>
-              </Popover>
-            )}
+            {/* Calendar removed for now */}
             <Button variant="outline" size="sm" onClick={handleRefresh}>
               <RefreshCw className="h-4 w-4 mr-2" />
               Refresh
-            </Button>
-            <Button variant="outline" size="sm" onClick={() => handleExport("all")}>
-              <Download className="h-4 w-4 mr-2" />
-              Export
             </Button>
           </div>
         </div>
@@ -147,8 +276,8 @@ const ReportingAudits = () => {
               value={overview.pendingDisputes.toString()}
             />
             <MetricCard 
-              title="Revenue Today" 
-              value={`$${overview.revenueToday.toLocaleString()}`}
+              title="Revenue" 
+              value={`$${overview.revenue.toLocaleString()}`}
             />
           </div>
         )}
@@ -169,10 +298,18 @@ const ReportingAudits = () => {
           <TabsContent value="staff" className="space-y-4">
             <div className="flex justify-between items-center">
               <h2 className="text-xl font-semibold">Staff Performance</h2>
-              <Button variant="outline" size="sm" onClick={() => handleExport("staff")}>
-                <Download className="h-4 w-4 mr-2" />
-                Export Staff Report
-              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm">
+                    <Download className="h-4 w-4 mr-2" />
+                    Export Staff Report
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={exportStaffAsPDF}>Export as PDF</DropdownMenuItem>
+                  <DropdownMenuItem onClick={exportStaffAsCSV}>Export as Excel (CSV)</DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
             <StaffKPIsTable data={staffKPIs} />
           </TabsContent>
@@ -180,10 +317,18 @@ const ReportingAudits = () => {
           <TabsContent value="reseller" className="space-y-4">
             <div className="flex justify-between items-center">
               <h2 className="text-xl font-semibold">Reseller Performance</h2>
-              <Button variant="outline" size="sm" onClick={() => handleExport("reseller")}>
-                <Download className="h-4 w-4 mr-2" />
-                Export Reseller Report
-              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm">
+                    <Download className="h-4 w-4 mr-2" />
+                    Export Reseller Report
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={exportResellerAsPDF}>Export as PDF</DropdownMenuItem>
+                  <DropdownMenuItem onClick={exportResellerAsCSV}>Export as Excel (CSV)</DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
             <ResellerKPIsTable data={resellerKPIs} />
           </TabsContent>

@@ -18,7 +18,7 @@ interface OverviewDashboardProps {
     totalOrdersToday: number;
     activeStaffCount: number;
     pendingDisputes: number;
-    revenueToday: number;
+    revenue: number;
     disputeRate: number;
     ordersCompleted: number;
     disputesResolved: number;

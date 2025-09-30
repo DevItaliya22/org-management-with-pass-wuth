@@ -37,7 +37,7 @@ interface ResellerKPIData {
   disputeRate: number; // Dispute percentage
   lowValueOrders: number; // Orders below $44
   autoCancelRate: number; // Auto-cancel percentage
-  revenueToday: number;
+  revenue: number;
 }
 
 interface ResellerKPIsTableProps {
@@ -88,7 +88,7 @@ export const ResellerKPIsTable = ({ data }: ResellerKPIsTableProps) => {
   };
 
   // Sort by revenue (descending)
-  const sortedData = [...data].sort((a, b) => b.revenueToday - a.revenueToday);
+  const sortedData = [...data].sort((a, b) => b.revenue - a.revenue);
 
   // Calculate alerts
   const highDisputeTeams = sortedData.filter(team => team.disputeRate > 10);
@@ -145,7 +145,7 @@ export const ResellerKPIsTable = ({ data }: ResellerKPIsTableProps) => {
                   <TableHead className="text-center">Dispute Rate</TableHead>
                   <TableHead className="text-center">Low-Value Orders</TableHead>
                   <TableHead className="text-center">Auto-Cancel Rate</TableHead>
-                  <TableHead className="text-center">Revenue Today</TableHead>
+                  <TableHead className="text-center">Revenue</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -199,9 +199,9 @@ export const ResellerKPIsTable = ({ data }: ResellerKPIsTableProps) => {
                     </TableCell>
                     
                     <TableCell className="text-center">
-                      <div className={`flex items-center justify-center gap-1 ${getPerformanceColor(team.revenueToday, "revenue")}`}>
+                      <div className={`flex items-center justify-center gap-1 ${getPerformanceColor(team.revenue, "revenue")}`}>
                         <DollarSign className="h-4 w-4" />
-                        <span className="font-medium">${team.revenueToday.toLocaleString()}</span>
+                        <span className="font-medium">${team.revenue.toLocaleString()}</span>
                       </div>
                     </TableCell>
                     

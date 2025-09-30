@@ -1,4 +1,5 @@
 import { query } from "./_generated/server";
+import { Id } from "./_generated/dataModel";
 import { v } from "convex/values";
 
 // Get staff KPIs for owner dashboard
@@ -25,7 +26,16 @@ export const getStaffKPIs = query({
 
     // Get all active staff
     const staff = await ctx.db.query("staff").collect();
-    const staffKPIs = [];
+    const staffKPIs: Array<{
+      staffId: Id<"users">;
+      staffName: string;
+      aht: number;
+      successRate: number;
+      passHoldRatio: number;
+      ordersToday: number;
+      totalOrders: number;
+      status: "online" | "paused" | "offline";
+    }> = [];
 
     for (const s of staff) {
       if (!s.isActive) continue;
@@ -122,7 +132,7 @@ export const getResellerKPIs = query({
     disputeRate: v.number(), // Dispute percentage
     lowValueOrders: v.number(), // Orders below $44
     autoCancelRate: v.number(), // Auto-cancel percentage
-    revenueToday: v.number(),
+    revenue: v.number(),
   })),
   handler: async (ctx, args) => {
     const startTime = args.dateRange?.start || (Date.now() - 24 * 60 * 60 * 1000);
@@ -148,6 +158,7 @@ export const getResellerKPIs = query({
       // Calculate KPIs
       const createdOrders = teamLogs.filter(log => log.actionType === "order_created");
       const completedOrders = teamLogs.filter(log => log.actionType === "order_completed");
+      const disputesResolved = teamLogs.filter(log => log.actionType === "dispute_resolved");
       const disputedOrders = teamLogs.filter(log => log.actionType === "order_disputed");
       const autoCancelledOrders = teamLogs.filter(log => log.actionType === "order_auto_cancelled");
       const fulfilledOrders = teamLogs.filter(log => log.actionType === "fulfil_submitted");
@@ -172,8 +183,8 @@ export const getResellerKPIs = query({
       const disputeRate = fulfilledOrders.length > 0 ? (disputedOrders.length / fulfilledOrders.length) * 100 : 0;
       const autoCancelRate = createdOrders.length > 0 ? (autoCancelledOrders.length / createdOrders.length) * 100 : 0;
 
-      // Calculate revenue (sum of completed orders)
-      const revenueToday = completedOrders.reduce((sum, log) => {
+      // Calculate revenue (sum within selected date range) - completed + disputes resolved
+      const revenue = [...completedOrders, ...disputesResolved].reduce((sum, log) => {
         return sum + (log.metrics?.orderValue || 0);
       }, 0);
 
@@ -185,7 +196,7 @@ export const getResellerKPIs = query({
         disputeRate: Math.round(disputeRate * 10) / 10,
         lowValueOrders,
         autoCancelRate: Math.round(autoCancelRate * 10) / 10,
-        revenueToday: Math.round(revenueToday * 100) / 100,
+        revenue: Math.round(revenue * 100) / 100,
       });
     }
 
@@ -288,7 +299,7 @@ export const getDashboardOverview = query({
     totalOrdersToday: v.number(),
     activeStaffCount: v.number(),
     pendingDisputes: v.number(),
-    revenueToday: v.number(),
+    revenue: v.number(),
     disputeRate: v.number(),
     ordersCompleted: v.number(),
     disputesResolved: v.number(),
@@ -362,13 +373,13 @@ export const getDashboardOverview = query({
     const disputeRate = todayOrders.length > 0 ? (ordersWithDisputes / todayOrders.length) * 100 : 0;
 
     // Calculate revenue from audit logs (orders completed + disputes resolved today)
-    let revenueToday = 0;
+    let revenue = 0;
     const revenueLogs = todayAuditLogs.filter(log => 
       log.actionType === "order_completed" || log.actionType === "dispute_resolved"
     );
     for (const log of revenueLogs) {
       if (log.metrics?.orderValue) {
-        revenueToday += log.metrics.orderValue;
+        revenue += log.metrics.orderValue;
       }
     }
 
@@ -388,7 +399,7 @@ export const getDashboardOverview = query({
       totalOrdersToday: todayOrders.length,
       activeStaffCount: activeStaff.length,
       pendingDisputes: pendingDisputes.length,
-      revenueToday: Math.round(revenueToday * 100) / 100,
+      revenue: Math.round(revenue * 100) / 100,
       disputeRate: Math.round(disputeRate * 100) / 100,
       ordersCompleted,
       disputesResolved,
