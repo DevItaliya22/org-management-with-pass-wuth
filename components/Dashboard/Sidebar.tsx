@@ -51,6 +51,11 @@ export function Sidebar({ className }: SidebarProps) {
       href: "/owner/disputes",
       icon: ShieldCheck,
     });
+    items.push({
+      name: "Reports & Audits",
+      href: "/reporting-audits",
+      icon: ShieldCheck,
+    });
   } else if (!isLoading && isStaff) {
     // Dashboard only
     items.push({

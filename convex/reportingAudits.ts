@@ -198,6 +198,10 @@ export const getRecentActivity = query({
   args: {
     limit: v.optional(v.number()),
     actionTypes: v.optional(v.array(v.string())),
+    dateRange: v.optional(v.object({
+      start: v.number(),
+      end: v.number(),
+    })),
   },
   returns: v.array(v.object({
     _id: v.id("auditLogs"),
@@ -218,10 +222,21 @@ export const getRecentActivity = query({
       "order_auto_cancelled", "dispute_resolved"
     ];
 
+    const rangeStart = args.dateRange?.start;
+    const rangeEnd = args.dateRange?.end;
+
     // Get recent audit logs
-    const auditLogs = await ctx.db
+    let queryBuilder = ctx.db
       .query("auditLogs")
-      .withIndex("by_createdAt")
+      .withIndex("by_createdAt");
+
+    if (rangeStart !== undefined && rangeEnd !== undefined) {
+      queryBuilder = queryBuilder.filter((q) =>
+        q.and(q.gte(q.field("createdAt"), rangeStart), q.lte(q.field("createdAt"), rangeEnd))
+      );
+    }
+
+    const auditLogs = await queryBuilder
       .order("desc")
       .take(limit * 2); // Get more to filter
 
@@ -263,7 +278,12 @@ export const getRecentActivity = query({
 
 // Get dashboard overview metrics
 export const getDashboardOverview = query({
-  args: {},
+  args: {
+    dateRange: v.optional(v.object({
+      start: v.number(),
+      end: v.number(),
+    })),
+  },
   returns: v.object({
     totalOrdersToday: v.number(),
     activeStaffCount: v.number(),
@@ -283,11 +303,14 @@ export const getDashboardOverview = query({
       cancelled: v.number(),
     }),
   }),
-  handler: async (ctx) => {
+  handler: async (ctx, args) => {
     const todayStart = new Date();
     todayStart.setHours(0, 0, 0, 0);
     const todayEnd = new Date();
     todayEnd.setHours(23, 59, 59, 999);
+
+    const rangeStart = args.dateRange?.start ?? todayStart.getTime();
+    const rangeEnd = args.dateRange?.end ?? todayEnd.getTime();
 
     // Get today's orders
     const todayOrders = await ctx.db
@@ -295,8 +318,8 @@ export const getDashboardOverview = query({
       .withIndex("by_createdAt")
       .filter((q) => 
         q.and(
-          q.gte(q.field("createdAt"), todayStart.getTime()),
-          q.lte(q.field("createdAt"), todayEnd.getTime())
+          q.gte(q.field("createdAt"), rangeStart),
+          q.lte(q.field("createdAt"), rangeEnd)
         )
       )
       .collect();
@@ -324,8 +347,8 @@ export const getDashboardOverview = query({
       .withIndex("by_createdAt")
       .filter((q) => 
         q.and(
-          q.gte(q.field("createdAt"), todayStart.getTime()),
-          q.lte(q.field("createdAt"), todayEnd.getTime())
+          q.gte(q.field("createdAt"), rangeStart),
+          q.lte(q.field("createdAt"), rangeEnd)
         )
       )
       .collect();
